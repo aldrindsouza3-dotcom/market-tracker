@@ -1,0 +1,64 @@
+{
+ "picks": [
+  {
+   "date": "2026-11-11",
+   "symbol": "KOTAKBANK.NS",
+   "name": "Kotak Mahindra Bank",
+   "entry": 483.8500061035156,
+   "stop": 462.7,
+   "target": 515.57,
+   "status": "OPEN",
+   "last": 484.70001220703125,
+   "pnl_pct": 0.18
+  },
+  {
+   "date": "2026-11-11",
+   "symbol": "TECHM.NS",
+   "name": "Tech Mahindra",
+   "entry": 1778.0,
+   "stop": 1678.75,
+   "target": 1926.88,
+   "status": "OPEN",
+   "last": 1783.5,
+   "pnl_pct": 0.31
+  },
+  {
+   "date": "2026-11-11",
+   "symbol": "DIVISLAB.NS",
+   "name": "Divi's Labs",
+   "entry": 11237.5,
+   "stop": 10540.04,
+   "target": 12283.68,
+   "status": "OPEN",
+   "last": 11306.0,
+   "pnl_pct": 0.61
+  },
+  {
+   "date": "2026-11-11",
+   "symbol": "ADANIPORTS.NS",
+   "name": "Adani Ports",
+   "entry": 1922.199951171875,
+   "stop": 1818.52,
+   "target": 2077.73,
+   "status": "OPEN",
+   "last": 1924.5999755859375,
+   "pnl_pct": 0.12
+  },
+  {
+   "date": "2026-11-11",
+   "symbol": "HCLTECH.NS",
+   "name": "HCL Tech",
+   "entry": 1397.9000244140625,
+   "stop": 1317.62,
+   "target": 1518.31,
+   "status": "OPEN",
+   "last": 1400.0,
+   "pnl_pct": 0.15
+  }
+ ],
+ "summary": {
+  "total": 5,
+  "open": 5,
+  "hit_rate": null
+ }
+}
