@@ -28,6 +28,17 @@ def _web_push(title, body, url, sent):
         from pywebpush import webpush, WebPushException
     except ImportError:
         print("  ! pywebpush not installed"); return
+    # Accept the private key as raw base64url (what the browser/py-vapid generate); convert to PEM for pywebpush.
+    if "BEGIN" not in priv:
+        try:
+            import base64
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import ec
+            d = base64.urlsafe_b64decode(priv.strip() + "=" * (-len(priv.strip()) % 4))
+            priv = ec.derive_private_key(int.from_bytes(d, "big"), ec.SECP256R1()).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+        except Exception as ex:
+            print("  ! could not parse VAPID_PRIVATE_KEY:", str(ex)[:120]); return
     subs_raw = subs_raw.strip()
     try:  # accept one subscription object, or a JSON array of them
         parsed = json.loads(subs_raw)
