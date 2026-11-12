@@ -21,7 +21,7 @@ def _web_push(title, body, url, sent):
     e = os.environ.get
     priv, subs_raw = e("VAPID_PRIVATE_KEY"), e("PUSH_SUBS")
     # pywebpush needs 'sub' as a mailto: link; default avoids an extra secret and keeps no personal email in the repo.
-    subj = e("VAPID_SUBJECT") or "mailto:noreply@example.com"
+    subj = e("VAPID_SUBJECT") or "mailto:aldrindsouza3-dotcom@users.noreply.github.com"
     if not (priv and subs_raw):
         return
     try:
@@ -58,7 +58,12 @@ def _web_push(title, body, url, sent):
             webpush(subscription_info=s, data=payload, vapid_private_key=key_path, vapid_claims={"sub": subj})
             ok += 1
         except WebPushException as ex:
-            print("  ! web push failed (subscription may have expired, re-enable in the app):", str(ex)[:120])
+            body = ""
+            try:
+                body = ex.response.text[:300] if ex.response is not None else ""
+            except Exception:
+                pass
+            print("  ! web push failed:", str(ex)[:100], "| body:", body)
         except Exception as ex:
             print("  ! web push error:", str(ex)[:120])
     try:
