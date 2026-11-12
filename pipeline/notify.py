@@ -19,8 +19,10 @@ def _web_push(title, body, url, sent):
     """Send to the installed PWA directly via the Web Push protocol (VAPID). No third-party app."""
     import json
     e = os.environ.get
-    priv, subj, subs_raw = e("VAPID_PRIVATE_KEY"), e("VAPID_SUBJECT"), e("PUSH_SUBS")
-    if not (priv and subj and subs_raw):
+    priv, subs_raw = e("VAPID_PRIVATE_KEY"), e("PUSH_SUBS")
+    # Subject can be any valid https/mailto URL; default to the site so no extra secret is needed.
+    subj = e("VAPID_SUBJECT") or e("SITE_URL") or "https://aldrindsouza3-dotcom.github.io/market-tracker/"
+    if not (priv and subs_raw):
         return
     try:
         from pywebpush import webpush, WebPushException
