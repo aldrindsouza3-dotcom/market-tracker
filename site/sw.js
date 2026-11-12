@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and usable offline.
 // Strategy: cache-first for the shell (fast open), network-first for data (fresh prices).
-const SHELL = "mt-shell-v2";
+const SHELL = "mt-shell-v3";
 const SHELL_FILES = ["./", "./index.html", "./style.css", "./app.js", "./manifest.json",
   "./icon-192.png", "./icon-512.png"];
 

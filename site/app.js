@@ -215,8 +215,10 @@ async function enableAlerts() {
   const perm = await Notification.requestPermission();
   if (perm !== "granted") { alert("Notifications are blocked. Enable them for this app in your phone settings, then try again."); return; }
   const reg = await navigator.serviceWorker.ready;
-  let sub = await reg.pushManager.getSubscription();
-  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC) });
+  // Always re-subscribe fresh: an old subscription may be tied to a stale key and the push server would reject it.
+  const old = await reg.pushManager.getSubscription();
+  if (old) { try { await old.unsubscribe(); } catch {} }
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC) });
   reg.showNotification("Alerts are on ✓", { body: "Your daily Top 5 will appear here.", icon: "icon-192.png" });
   showSubModal(JSON.stringify(sub));
   alertsBtn.textContent = "Alerts on ✓"; alertsBtn.classList.add("done");
