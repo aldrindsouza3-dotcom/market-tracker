@@ -6,10 +6,10 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, tab = "today";
+let D = null, TR = null, HIST = [], tab = "today";
 const sortState = {};
 
-const TABS = [["today", "Today"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
+const TABS = [["today", "Today"], ["overview", "Overview"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
 ["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["news", "News"], ["how", "How it works"]];
 
 async function load() {
@@ -17,6 +17,7 @@ async function load() {
     const t = Date.now();
     D = await (await fetch("data/latest.json?" + t)).json();
     try { TR = await (await fetch("data/track_record.json?" + t)).json(); } catch { TR = { picks: [], summary: {} }; }
+    try { HIST = await (await fetch("data/history.json?" + t)).json(); } catch { HIST = []; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
   }
@@ -29,7 +30,7 @@ async function load() {
 }
 function load2() {
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
-  $("#view").innerHTML = ({ today, stocks, funds, metals, fx, global, ipo, track, news, how }[tab])();
+  $("#view").innerHTML = ({ today, overview, stocks, funds, metals, fx, global, ipo, track, news, how }[tab])();
   wireTables();
 }
 
@@ -40,6 +41,70 @@ function pickCard(p, i) {
   return `<div class="card pick"><div class="top"><h3>${i}. ${esc(p.name)}</h3>${chip(p.signal)}</div>
     <div class="muted">${esc(p.kind)} · score ${p.score}</div>${lv}<div class="muted" style="margin-top:6px">${esc(p.reason)}</div></div>`;
 }
+// ---- inline SVG charts (no external library, works offline) ----
+function sparkline(vals, up = true) {
+  vals = vals.filter(v => v != null);
+  if (vals.length < 2) return `<div class="muted" style="font-size:12px">Trend builds up over the next few days.</div>`;
+  const w = 300, h = 60, mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 4 - (v - mn) / rng * (h - 8)).toFixed(1)}`);
+  const col = (vals[vals.length - 1] >= vals[0]) === up ? "var(--up)" : "var(--down)";
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.join(" ")}"/>
+    <polygon fill="${col}" opacity=".10" points="0,${h} ${pts.join(" ")} ${w},${h}"/></svg>`;
+}
+function gauge(pct01) {
+  const a = Math.PI * (1 - (pct01 ?? 0)), cx = 90, cy = 90, r = 76;
+  const x = cx + r * Math.cos(a), y = cy - r * Math.sin(a);
+  const col = pct01 > 0.6 ? "var(--up)" : pct01 < 0.4 ? "var(--down)" : "var(--warn)";
+  return `<svg viewBox="0 0 180 104" style="width:180px;max-width:60vw">
+    <path d="M14 90 A76 76 0 0 1 166 90" fill="none" stroke="var(--line)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M14 90 A76 76 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${col}" stroke-width="14" stroke-linecap="round"/>
+    <text x="90" y="80" text-anchor="middle" font-size="26" font-weight="700" fill="var(--ink)">${pct01 == null ? "–" : Math.round(pct01 * 100) + "%"}</text>
+    <text x="90" y="98" text-anchor="middle" font-size="11" fill="var(--muted)">above 200-day avg</text></svg>`;
+}
+function sectorBar(s, maxAbs) {
+  const w = Math.min(50, Math.abs(s.avg_day) / maxAbs * 50), pos = s.avg_day >= 0;
+  return `<div class="srow"><div>${esc(s.sector)} <span class="muted">(${s.count})</span></div>
+    <div class="sbar"><i style="${pos ? "left:50%" : "right:50%"};width:${w}%;background:${pos ? "var(--up)" : "var(--down)"}"></i>
+    <b>${pct(s.avg_day)}</b><span class="r muted">score ${s.avg_score}</span></div></div>`;
+}
+
+function overview() {
+  const o = D.overview;
+  if (!o) return `<div class="card">Overview will appear after the next data update.</div>`;
+  const total = o.advancers + o.decliners + (o.unchanged || 0);
+  const aPct = total ? o.advancers / total * 100 : 50;
+  const maxAbs = Math.max(0.001, ...o.sectors.map(s => Math.abs(s.avg_day)));
+  const snapCard = (k, v) => v ? `<div class="kpi"><div class="l">${esc(k)}</div><div class="v">${num(v.price, v.price > 500 ? 0 : 2)}</div><div>${pct(v.day)} <span class="muted">1M ${pct(v.ret_1m, 0)}</span></div></div>` : "";
+  const mv = (m, sign) => `<div class="mv"><span>${esc(m.name)}</span><span class="${sign}">${pct(m.day)}</span></div>`;
+  const regcol = D.regime === "RISK-ON" ? "up" : D.regime === "RISK-OFF" ? "down" : "";
+  return `<h2>Market overview</h2>
+  <div class="card" style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+    <div>${gauge(D.breadth_above_200dma)}</div>
+    <div style="flex:1;min-width:200px">
+      <div class="muted">Regime</div><div class="regime ${regcol}">${D.regime}</div>
+      <div class="adc" style="margin-top:10px"><div class="a" style="width:${aPct}%">${o.advancers} up</div><div class="d" style="width:${100 - aPct}%">${o.decliners} down</div></div>
+      <div class="muted" style="margin-top:6px">${o.buy_signals} BUY · ${o.sell_signals} SELL signals across ${total} tracked stocks</div>
+    </div></div>
+
+  <h2>Snapshot</h2><div class="kpis">${Object.entries(o.snapshot).map(([k, v]) => snapCard(k, v)).join("")}</div>
+
+  <h2>Sector performance (today)</h2><div class="card">${o.sectors.map(s => sectorBar(s, maxAbs)).join("") || "<span class='muted'>No sector data.</span>"}</div>
+
+  <div class="grid">
+    <div class="card"><b>Top gainers</b>${o.top_gainers.map(m => mv(m, "up")).join("")}</div>
+    <div class="card"><b>Top losers</b>${o.top_losers.map(m => mv(m, "down")).join("")}</div>
+  </div>
+
+  <h2>Trends ${HIST.length < 2 ? "<span class='muted' style='font-size:13px'>(fills in over the coming days)</span>" : `<span class="muted" style="font-size:13px">(last ${HIST.length} days)</span>`}</h2>
+  <div class="grid">
+    ${[["Nifty 50", "nifty", true], ["Sensex", "sensex", true], ["Gold ($)", "gold", true], ["Silver ($)", "silver", true], ["USD/INR", "usdinr", false], ["Market breadth", "breadth", true]]
+      .map(([lbl, key, up]) => `<div class="card"><div class="l muted">${lbl}</div>${sparkline(HIST.map(h => h[key]), up)}
+        <div class="muted" style="font-size:12px">${HIST.length ? "latest " + num(HIST[HIST.length - 1][key], key === "breadth" ? 2 : 0) : ""}</div></div>`).join("")}
+  </div>
+  <p class="muted">All figures from the latest end-of-day run. "Market breadth" = share of tracked Indian stocks above their 200-day average (a breadth above ~0.6 is healthy, below ~0.4 is weak).</p>`;
+}
+
 function today() {
   const r = D.regime, col = r === "RISK-ON" ? "up" : r === "RISK-OFF" ? "down" : "";
   const nifty = D.indices.find(i => i.symbol === "^NSEI"), sensex = D.indices.find(i => i.symbol === "^BSESN");
@@ -116,3 +181,14 @@ const how = () => `<h2>How the picks are made</h2><div class="card"><ul>
 
 if (location.hash.slice(1) && TABS.some(t => t[0] === location.hash.slice(1))) tab = location.hash.slice(1);
 load();
+
+// ---- PWA: install prompt + service worker ----
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+let deferredPrompt = null;
+const installBtn = $("#install");
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; if (installBtn) installBtn.hidden = false; });
+if (installBtn) installBtn.onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.hidden = true;
+};
+window.addEventListener("appinstalled", () => { if (installBtn) installBtn.hidden = true; });

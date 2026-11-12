@@ -159,12 +159,42 @@ def main():
                  and all(r["symbol"] != t["symbol"] for t in top5)]
         top5 += extra[:5 - len(top5)]
 
+    # Overview / analytics block, all derived from today's data (no history needed).
+    adv = sum(1 for s in stocks if s["day_change"] > 0)
+    dec = sum(1 for s in stocks if s["day_change"] < 0)
+    sec = {}
+    for s in stocks:
+        k = s.get("sector") or "Unknown"
+        sec.setdefault(k, []).append(s)
+    sectors = sorted(({"sector": k, "count": len(v),
+                       "avg_day": sum(x["day_change"] for x in v) / len(v),
+                       "avg_score": round(sum(x["score"] for x in v) / len(v), 1),
+                       "avg_3m": sum((x["ret_3m"] or 0) for x in v) / len(v)}
+                      for k, v in sec.items() if k != "Unknown"), key=lambda r: -r["avg_day"])
+    movers = sorted(stocks, key=lambda r: -(r["day_change"] or 0))
+    snap = lambda sym, lst: next(({"name": x["name"], "price": x["price"], "day": x["day_change"],
+                                   "ret_1m": x["ret_1m"], "signal": x.get("signal")}
+                                  for x in lst if x["symbol"] == sym), None)
+    overview = {
+        "advancers": adv, "decliners": dec, "unchanged": len(stocks) - adv - dec,
+        "buy_signals": sum(1 for s in stocks if s["signal"] == "BUY"),
+        "sell_signals": sum(1 for s in stocks if s["signal"].startswith("SELL")),
+        "sectors": sectors,
+        "top_gainers": [{"name": m["name"], "day": m["day_change"], "signal": m["signal"]} for m in movers[:5]],
+        "top_losers": [{"name": m["name"], "day": m["day_change"], "signal": m["signal"]} for m in movers[-5:][::-1]],
+        "snapshot": {"Nifty 50": snap("^NSEI", indices), "Sensex": snap("^BSESN", indices),
+                     "Bank Nifty": snap("^NSEBANK", indices), "S&P 500": snap("^GSPC", indices),
+                     "Nikkei": snap("^N225", indices), "Gold": snap("GC=F", commodities),
+                     "Silver": snap("SI=F", commodities), "USD/INR": snap("USDINR=X", currencies)},
+    }
+
     out = {"generated_at": now.isoformat(), "asof_note": "End-of-day data (Yahoo Finance, delayed). Prices in local currency; INR for India.",
-           "regime": regime, "breadth_above_200dma": breadth, "top5": top5, "stocks": stocks, "indices": indices,
+           "regime": regime, "breadth_above_200dma": breadth, "overview": overview, "top5": top5, "stocks": stocks, "indices": indices,
            "commodities": commodities, "currencies": currencies, "yields": yields, "mutual_funds": funds,
            "ipos": ipos, "news": news, "data_gaps": gaps, "disclaimer": DISCLAIMER}
     (OUT / "latest.json").write_text(json.dumps(clean(out), indent=1), encoding="utf-8")
 
+    append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec)
     update_track_record(now, top5, px)
 
     print(f"Regime {regime}; Top 5:")
@@ -180,6 +210,20 @@ def main():
         lines.append(DISCLAIMER)
         sent = N.send_all(f"Top 5 picks - {now:%d %b}", "\n".join(lines), SITE_URL or None)
         print("Notified via:", sent or "nothing (no channel configured)")
+
+
+def append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec):
+    """One row per day, so the Overview tab can draw trend lines that grow over time."""
+    f = OUT / "history.json"
+    hist = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+    day = now.strftime("%Y-%m-%d")
+    g = lambda sym, lst: next((x["price"] for x in lst if x["symbol"] == sym), None)
+    row = {"date": day, "regime": regime, "breadth": round(breadth, 3) if breadth is not None else None,
+           "nifty": nifty["price"] if nifty else None, "sensex": g("^BSESN", indices),
+           "gold": g("GC=F", commodities), "silver": g("SI=F", commodities), "usdinr": g("USDINR=X", currencies),
+           "advancers": adv, "decliners": dec}
+    hist = [h for h in hist if h["date"] != day] + [row]
+    f.write_text(json.dumps(clean(hist[-400:]), indent=1), encoding="utf-8")
 
 
 def _distinct_category(funds):

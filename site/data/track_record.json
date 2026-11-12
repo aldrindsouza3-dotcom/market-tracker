@@ -8,8 +8,8 @@
    "stop": 462.7,
    "target": 515.57,
    "status": "OPEN",
-   "last": 479.5,
-   "pnl_pct": -0.9
+   "last": 490.3999938964844,
+   "pnl_pct": 1.35
   },
   {
    "date": "2026-11-11",
@@ -19,8 +19,8 @@
    "stop": 1678.75,
    "target": 1926.88,
    "status": "OPEN",
-   "last": 1805.0,
-   "pnl_pct": 1.52
+   "last": 1774.0,
+   "pnl_pct": -0.22
   },
   {
    "date": "2026-11-11",
@@ -30,8 +30,8 @@
    "stop": 10540.04,
    "target": 12283.68,
    "status": "OPEN",
-   "last": 11565.5,
-   "pnl_pct": 2.92
+   "last": 11485.0,
+   "pnl_pct": 2.2
   },
   {
    "date": "2026-11-11",
@@ -41,8 +41,8 @@
    "stop": 1818.52,
    "target": 2077.73,
    "status": "OPEN",
-   "last": 1942.699951171875,
-   "pnl_pct": 1.07
+   "last": 1930.0,
+   "pnl_pct": 0.41
   },
   {
    "date": "2026-11-11",
@@ -52,40 +52,40 @@
    "stop": 1317.62,
    "target": 1518.31,
    "status": "OPEN",
-   "last": 1407.0,
-   "pnl_pct": 0.65
+   "last": 1380.800048828125,
+   "pnl_pct": -1.22
   },
   {
    "date": "2026-11-12",
    "symbol": "TECHM.NS",
    "name": "Tech Mahindra",
-   "entry": 1805.0,
-   "stop": 1705.22,
-   "target": 1954.67,
+   "entry": 1774.0,
+   "stop": 1677.69,
+   "target": 1918.46,
    "status": "OPEN",
-   "last": 1805.0,
+   "last": 1774.0,
    "pnl_pct": 0.0
   },
   {
    "date": "2026-11-12",
    "symbol": "COFORGE.NS",
    "name": "Coforge",
-   "entry": 2047.0,
-   "stop": 1908.93,
-   "target": 2254.11,
+   "entry": 2034.0,
+   "stop": 1897.82,
+   "target": 2238.27,
    "status": "OPEN",
-   "last": 2047.0,
+   "last": 2034.0,
    "pnl_pct": 0.0
   },
   {
    "date": "2026-11-12",
-   "symbol": "ZYDUSLIFE.NS",
-   "name": "Zydus Lifesciences",
-   "entry": 1215.9000244140625,
-   "stop": 1146.05,
-   "target": 1320.68,
+   "symbol": "LODHA.NS",
+   "name": "Macrotech Developers",
+   "entry": 1226.0,
+   "stop": 1136.36,
+   "target": 1360.46,
    "status": "OPEN",
-   "last": 1215.9000244140625,
+   "last": 1226.0,
    "pnl_pct": 0.0
   }
  ],
