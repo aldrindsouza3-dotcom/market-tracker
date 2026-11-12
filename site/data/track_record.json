@@ -8,8 +8,8 @@
    "stop": 462.7,
    "target": 515.57,
    "status": "OPEN",
-   "last": 490.3999938964844,
-   "pnl_pct": 1.35
+   "last": 487.70001220703125,
+   "pnl_pct": 0.8
   },
   {
    "date": "2026-11-11",
@@ -19,8 +19,8 @@
    "stop": 1678.75,
    "target": 1926.88,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": -0.22
+   "last": 1788.5,
+   "pnl_pct": 0.59
   },
   {
    "date": "2026-11-11",
@@ -30,8 +30,8 @@
    "stop": 10540.04,
    "target": 12283.68,
    "status": "OPEN",
-   "last": 11485.0,
-   "pnl_pct": 2.2
+   "last": 11367.0,
+   "pnl_pct": 1.15
   },
   {
    "date": "2026-11-11",
@@ -41,8 +41,8 @@
    "stop": 1818.52,
    "target": 2077.73,
    "status": "OPEN",
-   "last": 1930.0,
-   "pnl_pct": 0.41
+   "last": 1907.0,
+   "pnl_pct": -0.79
   },
   {
    "date": "2026-11-11",
@@ -52,8 +52,8 @@
    "stop": 1317.62,
    "target": 1518.31,
    "status": "OPEN",
-   "last": 1380.800048828125,
-   "pnl_pct": -1.22
+   "last": 1395.0,
+   "pnl_pct": -0.21
   },
   {
    "date": "2026-11-12",
@@ -63,8 +63,8 @@
    "stop": 1677.69,
    "target": 1918.46,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": 0.0
+   "last": 1788.5,
+   "pnl_pct": 0.82
   },
   {
    "date": "2026-11-12",
@@ -74,8 +74,8 @@
    "stop": 1897.82,
    "target": 2238.27,
    "status": "OPEN",
-   "last": 2034.0,
-   "pnl_pct": 0.0
+   "last": 2017.5,
+   "pnl_pct": -0.81
   },
   {
    "date": "2026-11-12",
@@ -85,13 +85,46 @@
    "stop": 1136.36,
    "target": 1360.46,
    "status": "OPEN",
-   "last": 1226.0,
+   "last": 1174.5,
+   "pnl_pct": -4.2
+  },
+  {
+   "date": "2026-11-13",
+   "symbol": "TECHM.NS",
+   "name": "Tech Mahindra",
+   "entry": 1788.5,
+   "stop": 1689.25,
+   "target": 1937.38,
+   "status": "OPEN",
+   "last": 1788.5,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-13",
+   "symbol": "COFORGE.NS",
+   "name": "Coforge",
+   "entry": 2017.5,
+   "stop": 1879.45,
+   "target": 2224.58,
+   "status": "OPEN",
+   "last": 2017.5,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-13",
+   "symbol": "INDHOTEL.NS",
+   "name": "Indian Hotels",
+   "entry": 873.0,
+   "stop": 828.5,
+   "target": 939.75,
+   "status": "OPEN",
+   "last": 873.0,
    "pnl_pct": 0.0
   }
  ],
  "summary": {
-  "total": 8,
-  "open": 8,
+  "total": 11,
+  "open": 11,
   "hit_rate": null
  }
 }
