@@ -20,25 +20,31 @@ def _web_push(title, body, url, sent):
     import json
     e = os.environ.get
     priv, subs_raw = e("VAPID_PRIVATE_KEY"), e("PUSH_SUBS")
-    # Subject can be any valid https/mailto URL; default to the site so no extra secret is needed.
-    subj = e("VAPID_SUBJECT") or e("SITE_URL") or "https://aldrindsouza3-dotcom.github.io/market-tracker/"
+    # pywebpush needs 'sub' as a mailto: link; default avoids an extra secret and keeps no personal email in the repo.
+    subj = e("VAPID_SUBJECT") or "mailto:noreply@example.com"
     if not (priv and subs_raw):
         return
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
         print("  ! pywebpush not installed"); return
-    # Accept the private key as raw base64url (what the browser/py-vapid generate); convert to PEM for pywebpush.
-    if "BEGIN" not in priv:
-        try:
+    # Accept the private key as raw base64url (what the browser/py-vapid generate); pywebpush wants a PEM FILE path.
+    import os as _os, tempfile
+    key_path = None
+    try:
+        if "BEGIN" in priv:
+            pem = priv
+        else:
             import base64
             from cryptography.hazmat.primitives import serialization
             from cryptography.hazmat.primitives.asymmetric import ec
             d = base64.urlsafe_b64decode(priv.strip() + "=" * (-len(priv.strip()) % 4))
-            priv = ec.derive_private_key(int.from_bytes(d, "big"), ec.SECP256R1()).private_bytes(
+            pem = ec.derive_private_key(int.from_bytes(d, "big"), ec.SECP256R1()).private_bytes(
                 serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-        except Exception as ex:
-            print("  ! could not parse VAPID_PRIVATE_KEY:", str(ex)[:120]); return
+        fp = tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False)
+        fp.write(pem); fp.close(); key_path = fp.name
+    except Exception as ex:
+        print("  ! could not parse VAPID_PRIVATE_KEY:", str(ex)[:120]); return
     subs_raw = subs_raw.strip()
     try:  # accept one subscription object, or a JSON array of them
         parsed = json.loads(subs_raw)
@@ -49,12 +55,17 @@ def _web_push(title, body, url, sent):
     ok = 0
     for s in subs:
         try:
-            webpush(subscription_info=s, data=payload, vapid_private_key=priv, vapid_claims={"sub": subj})
+            webpush(subscription_info=s, data=payload, vapid_private_key=key_path, vapid_claims={"sub": subj})
             ok += 1
         except WebPushException as ex:
             print("  ! web push failed (subscription may have expired, re-enable in the app):", str(ex)[:120])
         except Exception as ex:
             print("  ! web push error:", str(ex)[:120])
+    try:
+        if key_path:
+            _os.unlink(key_path)
+    except Exception:
+        pass
     if ok:
         sent.append(f"app-push x{ok}")
 
