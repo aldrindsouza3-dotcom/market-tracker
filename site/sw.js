@@ -11,6 +11,23 @@ self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== SHELL).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
+// Web push: the installed app shows the notification itself (no ntfy app needed).
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data.json(); } catch { d = { title: "Market Tracker", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Market Tracker", {
+    body: d.body || "", icon: "icon-192.png", badge: "icon-192.png",
+    data: { url: d.url || "./" }, tag: "daily-top5", renotify: true,
+  }));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
+    for (const c of cs) if ("focus" in c) return c.focus();
+    return clients.openWindow(e.notification.data && e.notification.data.url || "./");
+  }));
+});
+
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;

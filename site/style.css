@@ -6,7 +6,14 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-app
 header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 .bar{display:flex;justify-content:space-between;align-items:baseline;padding-top:12px;gap:12px;flex-wrap:wrap}
 .barright{display:flex;align-items:center;gap:10px}
-#install{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+#install,#alerts{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+#alerts.done{background:var(--chip);color:var(--muted)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;max-width:460px;width:100%}
+.modal textarea{width:100%;height:90px;font-family:monospace;font-size:11px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--ink);resize:none}
+.modal button{margin-top:10px;margin-right:8px}
+.modal .ok{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.modal .sec{background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 14px;font:inherit;cursor:pointer}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .kpi .v{font-size:22px;font-weight:700;line-height:1.1;margin-top:2px}

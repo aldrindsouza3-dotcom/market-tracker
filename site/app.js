@@ -192,3 +192,36 @@ if (installBtn) installBtn.onclick = async () => {
   deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.hidden = true;
 };
 window.addEventListener("appinstalled", () => { if (installBtn) installBtn.hidden = true; });
+
+// ---- Web push: the installed app shows notifications itself ----
+const VAPID_PUBLIC = "BBDbejKiTatsQvtGne7DepLU-mJnTHrOI3zQhIMivYb8Zh2fAN1aFOrqPhcAZCxSOeZSkMq5Y1RNktGTAPqN8Jo";
+const b64ToU8 = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+const alertsBtn = $("#alerts");
+function showSubModal(json) {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box"><b>Last step — paste this code into GitHub</b>
+    <p class="muted" style="font-size:13px">Copy the text below, then in GitHub add a secret named <code>PUSH_SUBS</code> with this as its value. After that, this app shows your daily alerts itself.</p>
+    <textarea readonly id="subtext">${esc(json)}</textarea>
+    <div><button class="ok" id="copySub">Copy</button><button class="sec" id="closeSub">Close</button></div></div>`;
+  document.body.appendChild(m);
+  $("#copySub", m).onclick = () => { navigator.clipboard.writeText(json).then(() => $("#copySub", m).textContent = "Copied ✓"); };
+  $("#closeSub", m).onclick = () => m.remove();
+  m.onclick = e => { if (e.target === m) m.remove(); };
+}
+async function enableAlerts() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    alert("Your browser doesn't support app notifications. Open the site in Chrome and install the app first."); return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { alert("Notifications are blocked. Enable them for this app in your phone settings, then try again."); return; }
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC) });
+  reg.showNotification("Alerts are on ✓", { body: "Your daily Top 5 will appear here.", icon: "icon-192.png" });
+  showSubModal(JSON.stringify(sub));
+  alertsBtn.textContent = "Alerts on ✓"; alertsBtn.classList.add("done");
+}
+if (alertsBtn) {
+  if (window.Notification && Notification.permission === "granted") { alertsBtn.textContent = "Alerts on ✓"; alertsBtn.classList.add("done"); }
+  alertsBtn.onclick = enableAlerts;
+}

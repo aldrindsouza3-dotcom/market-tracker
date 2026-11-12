@@ -1,5 +1,6 @@
 """Daily push. Configure any of these via environment variables / GitHub secrets; unset channels are skipped.
 
+App push (own PWA, no app):  VAPID_PRIVATE_KEY + VAPID_SUBJECT + PUSH_SUBS (JSON sub, or list of them)
 Phone push (easiest, free):  NTFY_TOPIC            -> install the ntfy app, subscribe to your secret topic
 Telegram:                    TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
 WhatsApp (Meta Cloud API):   WA_TOKEN + WA_PHONE_ID + WA_TO (+ optional WA_TEMPLATE)
@@ -14,9 +15,41 @@ from email.message import EmailMessage
 import requests
 
 
+def _web_push(title, body, url, sent):
+    """Send to the installed PWA directly via the Web Push protocol (VAPID). No third-party app."""
+    import json
+    e = os.environ.get
+    priv, subj, subs_raw = e("VAPID_PRIVATE_KEY"), e("VAPID_SUBJECT"), e("PUSH_SUBS")
+    if not (priv and subj and subs_raw):
+        return
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        print("  ! pywebpush not installed"); return
+    subs_raw = subs_raw.strip()
+    try:  # accept one subscription object, or a JSON array of them
+        parsed = json.loads(subs_raw)
+        subs = parsed if isinstance(parsed, list) else [parsed]
+    except Exception as ex:
+        print("  ! PUSH_SUBS not valid JSON:", ex); return
+    payload = json.dumps({"title": title, "body": body, "url": url or "./"})
+    ok = 0
+    for s in subs:
+        try:
+            webpush(subscription_info=s, data=payload, vapid_private_key=priv, vapid_claims={"sub": subj})
+            ok += 1
+        except WebPushException as ex:
+            print("  ! web push failed (subscription may have expired, re-enable in the app):", str(ex)[:120])
+        except Exception as ex:
+            print("  ! web push error:", str(ex)[:120])
+    if ok:
+        sent.append(f"app-push x{ok}")
+
+
 def send_all(title: str, body: str, url: str | None = None) -> list[str]:
     sent = []
     e = os.environ.get
+    _web_push(title, body, url, sent)
     if e("NTFY_TOPIC"):
         try:
             h = {"Title": title.encode("utf-8")[:250].decode("utf-8", "ignore"), "Priority": "default"}
