@@ -90,6 +90,25 @@ footer{padding:24px 16px 40px}
 .star{cursor:pointer;font-size:20px;background:none;border:0;color:var(--muted)}
 .star.on{color:#f5b301}
 
+/* AI assistant */
+#aifab{position:fixed;right:16px;bottom:78px;width:52px;height:52px;border-radius:50%;border:0;background:linear-gradient(135deg,#6366f1,#2dd4bf);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:45}
+@media(min-width:761px){#aifab{bottom:24px}}
+.aipanel{position:fixed;right:16px;bottom:140px;width:min(420px,calc(100vw - 32px));height:min(560px,70vh);background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.35);z-index:46;display:flex;flex-direction:column;overflow:hidden}
+.aipanel .ahead{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.aipanel .ahead b{font-size:15px}.aipanel .ahead .x{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer}
+.aimsgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.amsg{max-width:85%;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.5;white-space:pre-wrap}
+.amsg.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+.amsg.a{align-self:flex-start;background:var(--chip);color:var(--ink);border-bottom-left-radius:3px}
+.amsg.sys{align-self:center;color:var(--muted);font-size:12px;text-align:center;background:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 8px}
+.chips button{background:var(--chip);border:1px solid var(--line);color:var(--ink);border-radius:14px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+.ainput{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.ainput input{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.ainput button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:0 14px;font:inherit;font-weight:600;cursor:pointer}
+.ai-overview{background:linear-gradient(135deg,color-mix(in srgb,#6366f1 12%,var(--card)),color-mix(in srgb,#2dd4bf 10%,var(--card)));border:1px solid var(--line)}
+.ai-overview .tag{font-size:11px;font-weight:700;letter-spacing:.5px;color:#818cf8;text-transform:uppercase}
+
 /* bottom nav (mobile) */
 #bottomnav{display:none}
 @media (max-width:760px){

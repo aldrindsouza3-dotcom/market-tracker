@@ -6,7 +6,7 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, BT = null, tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, BT = null, BRIEF = null, tab = "today";
 const sortState = {};
 const LS = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const watch = () => LS.get("watchlist") || [];
@@ -28,6 +28,7 @@ async function load() {
     try { MODES = await (await fetch("data/modes.json?" + t)).json(); } catch { MODES = null; }
     try { IDX = await (await fetch("data/stocks_index.json?" + t)).json(); } catch { IDX = null; }
     try { BT = await (await fetch("data/backtest.json?" + t)).json(); } catch { BT = null; }
+    try { BRIEF = await (await fetch("data/brief.json?" + t)).json(); } catch { BRIEF = null; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
   }
@@ -256,11 +257,15 @@ async function openStock(sym) {
   catch { $(".sbody", el).innerHTML = `<div class="card warn">No detail for ${esc(sym)} yet — it may not be in the scored set. <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Open in Screener</a></div>`; return; }
   renderStock(el, d);
 }
-function closeStock() { const el = $("#detail"); el.hidden = true; document.body.style.overflow = ""; if (chart) { try { chart.remove(); } catch {} chart = null; } }
+function closeStock() { const el = $("#detail"); el.hidden = true; document.body.style.overflow = ""; window._openSym = null; window._openDetail = null; if (chart) { try { chart.remove(); } catch {} chart = null; } }
 window.addEventListener("popstate", () => { if (!$("#detail").hidden) closeStock(); });
 
 function renderStock(el, d) {
   const T = d.trading, I = d.investing, R = d.reading, star = inWatch(d.symbol) ? "on" : "";
+  window._openSym = d.symbol;
+  window._openDetail = { symbol: d.symbol, name: d.name, price: d.price, trading_score: T.score, trading_verdict: T.verdict,
+    buy_upto: T.buy_upto, stop: T.stop_loss, target_1: T.target_1, investing_score: I.score, investing_verdict: I.verdict,
+    rsi: d.indicators && d.indicators.rsi, reading_summary: R.summary, support: R.support, resistance: R.resistance, fundamentals: d.fundamentals };
   $("#dsub", el).textContent = `₹${num(d.price)} · ${d.day_change >= 0 ? "+" : ""}${(d.day_change * 100).toFixed(2)}% · as of ${d.asof}`;
   const fund = d.fundamentals ? `<div class="card"><b>Fundamentals</b><div class="lvl" style="grid-template-columns:auto 1fr auto 1fr">
     <span>P/E</span><span>${num(d.fundamentals.pe, 1)}</span><span>ROE</span><span>${d.fundamentals.roe != null ? (d.fundamentals.roe * 100).toFixed(0) + "%" : "–"}</span>
@@ -381,12 +386,18 @@ function today() {
   const q = i => i ? `<div><b>${esc(i.name)}</b> ${num(i.price)} ${pct(i.day_change)} <span class="muted">· ${esc(i.signal)}</span></div>` : "";
   const gold = D.commodities.find(c => c.symbol === "GC=F"), silver = D.commodities.find(c => c.symbol === "SI=F");
   const usd = D.currencies.find(c => c.symbol === "USDINR=X");
-  return `<div class="card"><div class="muted">Market regime</div><div class="regime ${col}">${r}</div>
-    <div class="muted">${D.breadth_above_200dma != null ? Math.round(D.breadth_above_200dma * 100) + "% of the tracked Indian stocks (Nifty-50 + 40 midcaps) above their 200-day average. " : ""}
+  const aiCard = BRIEF && BRIEF.brief ? `<div class="card ai-overview"><div class="tag">✨ AI overview</div><p style="margin:6px 0 0">${esc(BRIEF.brief)}</p><div class="muted" style="font-size:11px;margin-top:6px">Generated from today's computed data. Tap ✨ to ask follow-ups.</div></div>` : "";
+  const tt = MODES && MODES.trading_top5 || [], it = MODES && MODES.investing_top5 || [];
+  const shortlists = (tt.length || it.length) ? `
+    <h2>⚡ Trading shortlist</h2><div class="muted" style="font-size:13px;margin:-6px 0 6px">Swing ideas — tap for chart, levels & reading.</div>
+    ${tt.slice(0, 3).map(x => modeCard(x, "trading")).join("")}<p class="muted"><a href="#" onclick="go('trading');return false">See all trading →</a></p>
+    <h2>◈ Investing shortlist</h2><div class="muted" style="font-size:13px;margin:-6px 0 6px">Long-term ideas — quality & valuation first.</div>
+    ${it.slice(0, 3).map(x => modeCard(x, "investing")).join("")}<p class="muted"><a href="#" onclick="go('investing');return false">See all investing →</a></p>` : "";
+  return `${aiCard}<div class="card"><div class="muted">Market regime</div><div class="regime ${col}">${r}</div>
+    <div class="muted">${D.breadth_above_200dma != null ? Math.round(D.breadth_above_200dma * 100) + "% of the tracked Indian stocks above their 200-day average. " : ""}
     ${r === "RISK-OFF" ? "Be defensive: fewer new buys, smaller sizes." : r === "RISK-ON" ? "Trend and breadth support buying on dips." : "Mixed signals: be selective and stagger entries."}</div>
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:10px">${q(nifty)}${q(sensex)}${q(gold)}${q(silver)}${q(usd)}</div></div>
-    <h2>Today's top 5</h2><div class="grid">${D.top5.map((p, i) => pickCard(p, i + 1)).join("")}</div>
-    <p class="muted">Levels use volatility (ATR): stop = 2×ATR below, targets = 3× and 5×ATR above. Check the "How it works" tab and apply your own position sizing (risk ≤1–2% of capital per idea).</p>
+    ${shortlists}
     ${D.data_gaps.length ? `<p class="muted">Data gaps today: ${esc(D.data_gaps.join(", "))}</p>` : ""}`;
 }
 
@@ -451,6 +462,80 @@ const how = () => `<h2>How the picks are made</h2><div class="card"><ul>
 
 if (location.hash.slice(1) && TABS.some(t => t[0] === location.hash.slice(1))) tab = location.hash.slice(1);
 load();
+
+// ================= In-app AI assistant (uses YOUR Anthropic key, stored on this device only) =================
+const AI = { key: () => LS.get("anthropic_key"), model: () => LS.get("ai_model") || "claude-sonnet-5-5", history: [] };
+const TUTOR = `You are the built-in assistant inside a personal Indian stock-market dashboard called Market Tracker, used by one retail investor.
+Your jobs: (1) explain what the user is looking at and how to use the app's workflow; (2) teach stock-market concepts from basics to advanced (e.g. candlesticks, moving averages, RSI, MACD, valuation, P/E, ROE, position sizing, risk management, portfolio theory, market regimes, options basics) in plain language with small examples; (3) interpret the COMPUTED data you are given.
+Hard rules: use ONLY the numbers provided in context — never invent prices, levels or percentages; if you don't have a number, say so. Be concise and friendly. Never promise returns or give a guaranteed call. For anything actionable, remind that this is a research aid, not SEBI-registered advice, and to verify independently. Prefer short paragraphs and bullet points.`;
+
+function aiContext() {
+  const c = { tab, regime: D && D.regime, breadth: D && D.breadth_above_200dma };
+  if (!$("#detail").hidden && window._openSym) c.open_stock = window._openSym;
+  if (tab === "today" && BRIEF) c.ai_brief = BRIEF.brief;
+  if ((tab === "trading" || tab === "investing") && MODES) {
+    const key = tab === "trading" ? "trading_top5" : "investing_top5";
+    c[key] = (MODES[key] || []).map(r => ({ symbol: r.symbol, name: r.name, trading_score: r.trading_score, investing_score: r.investing_score, verdict: r.trading_verdict_txt || r.investing_verdict_txt }));
+  }
+  if (tab === "backtest" && BT) c.backtest = { win_rate: BT.win_rate, expectancy_pct: BT.expectancy_pct, verdict: BT.verdict };
+  if (window._openDetail) c.stock_detail = window._openDetail;
+  return c;
+}
+const QUICK = {
+  today: ["Explain today's market in simple words", "What should a beginner look at first?"],
+  trading: ["How do I use this trading shortlist?", "What is a stop-loss and position size?"],
+  investing: ["How is investing different from trading here?", "What makes a good long-term stock?"],
+  backtest: ["Is this strategy good? Explain the numbers", "What is expectancy and win rate?"],
+  _default: ["Explain this screen", "Teach me a stock-market basic", "What is RSI?"],
+};
+function aiToggle() { const p = $("#aipanel"); p.hidden ? aiRender() : (p.hidden = true); }
+function aiRender() {
+  const p = $("#aipanel"); p.hidden = false;
+  if (!AI.key()) {
+    p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><button class="x" onclick="document.getElementById('aipanel').hidden=true">×</button></div>
+      <div class="aimsgs"><div class="amsg a">Hi! I can explain any screen, teach stock-market concepts (basic to advanced), and interpret the app's numbers.
+      <br><br>To turn me on, paste your <b>Anthropic API key</b> (from console.anthropic.com). It's stored only on this device and never uploaded. The API bills per use (usually a few paise per question).</div></div>
+      <div class="ainput"><input id="aikey" type="password" placeholder="sk-ant-..."><button onclick="aiSaveKey()">Save</button></div>`;
+    return;
+  }
+  const chips = (QUICK[tab] || QUICK._default);
+  p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><span style="flex:1"></span><button class="x" title="Settings" onclick="aiSettings()">⚙</button><button class="x" onclick="document.getElementById('aipanel').hidden=true">×</button></div>
+    <div class="aimsgs" id="aimsgs">${AI.history.length ? "" : `<div class="amsg a">Ask me about the <b>${esc(tab)}</b> screen, or any market concept.</div>`}
+    ${AI.history.map(m => `<div class="amsg ${m.role === "user" ? "u" : "a"}">${esc(m.text)}</div>`).join("")}</div>
+    <div class="chips">${chips.map(q => `<button onclick="aiSend(this.textContent)">${esc(q)}</button>`).join("")}</div>
+    <div class="ainput"><input id="aiq" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'){aiSend(this.value);this.value=''}"><button onclick="var i=document.getElementById('aiq');aiSend(i.value);i.value=''">Send</button></div>`;
+  const m = $("#aimsgs"); m.scrollTop = m.scrollHeight;
+}
+function aiSaveKey() { const k = $("#aikey").value.trim(); if (k) { LS.set("anthropic_key", k); aiRender(); } }
+function aiSettings() {
+  const cur = AI.model();
+  const k = prompt("AI model (claude-sonnet-5-5 = balanced, claude-haiku-5-5 = cheapest, claude-opus-5-5 = best):", cur);
+  if (k) LS.set("ai_model", k.trim());
+  if (confirm("Clear your saved API key from this device?")) { localStorage.removeItem("anthropic_key"); AI.history = []; }
+  aiRender();
+}
+async function aiSend(text) {
+  text = (text || "").trim(); if (!text || !AI.key()) return;
+  AI.history.push({ role: "user", text }); aiRender();
+  const msgs = $("#aimsgs"); const bubble = document.createElement("div"); bubble.className = "amsg a"; bubble.textContent = "…"; msgs.appendChild(bubble); msgs.scrollTop = msgs.scrollHeight;
+  try {
+    const sys = TUTOR + "\n\nCONTEXT (computed app data for the user's current screen):\n" + JSON.stringify(aiContext());
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": AI.key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: AI.model(), max_tokens: 900, system: sys,
+        messages: AI.history.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })) }),
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ? j.error.message : "API error " + res.status);
+    const txt = (j.content && j.content[0] && j.content[0].text) || "(no reply)";
+    AI.history.push({ role: "assistant", text: txt });
+  } catch (e) {
+    AI.history.push({ role: "assistant", text: "⚠ " + e.message + (/401|authentication/i.test(e.message) ? " — check your API key in ⚙ settings." : "") });
+  }
+  aiRender();
+}
+$("#aifab").onclick = aiToggle;
 
 // ---- PWA: install prompt + service worker ----
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
