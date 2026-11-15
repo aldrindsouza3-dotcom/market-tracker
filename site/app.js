@@ -475,7 +475,24 @@ if (location.hash.slice(1) && TABS.some(t => t[0] === location.hash.slice(1))) t
 load();
 
 // ================= In-app AI assistant (uses YOUR Anthropic key, stored on this device only) =================
-const AI = { key: () => LS.get("anthropic_key"), model: () => LS.get("ai_model") || "claude-sonnet-5-5", history: [] };
+// Free, open-source-friendly AI providers (no card needed). Default = OpenRouter free Llama.
+const AI_PROVIDERS = {
+  openrouter: { label: "OpenRouter (free, open-source)", url: "https://openrouter.ai/api/v1/chat/completions", kind: "openai",
+    model: "meta-llama/llama-3.3-70b-instruct:free", keyUrl: "openrouter.ai/keys", keyHint: "or_... (free, no card)" },
+  groq: { label: "Groq (free, fast, Llama)", url: "https://api.groq.com/openai/v1/chat/completions", kind: "openai",
+    model: "llama-3.3-70b-versatile", keyUrl: "console.groq.com/keys", keyHint: "gsk_... (free, no card)" },
+  gemini: { label: "Google Gemini (free)", url: "https://generativelanguage.googleapis.com/v1beta/models", kind: "gemini",
+    model: "gemini-2.0-flash", keyUrl: "aistudio.google.com/apikey", keyHint: "AIza... (free, no card)" },
+  anthropic: { label: "Anthropic Claude (paid)", url: "https://api.anthropic.com/v1/messages", kind: "anthropic",
+    model: "claude-sonnet-5-5", keyUrl: "console.anthropic.com", keyHint: "sk-ant-... (needs payment)" },
+};
+const AI = {
+  provider: () => LS.get("ai_provider") || "openrouter",
+  cfg: () => AI_PROVIDERS[AI.provider()] || AI_PROVIDERS.openrouter,
+  key: () => LS.get("ai_key_" + (LS.get("ai_provider") || "openrouter")),
+  model: () => LS.get("ai_model_" + (LS.get("ai_provider") || "openrouter")) || AI.cfg().model,
+  history: [],
+};
 const TUTOR = `You are the built-in assistant inside a personal Indian stock-market dashboard called Market Tracker, used by one retail investor.
 Your jobs: (1) explain what the user is looking at and how to use the app's workflow; (2) teach stock-market concepts from basics to advanced (e.g. candlesticks, moving averages, RSI, MACD, valuation, P/E, ROE, position sizing, risk management, portfolio theory, market regimes, options basics) in plain language with small examples; (3) interpret the COMPUTED data you are given.
 Hard rules: use ONLY the numbers provided in context — never invent prices, levels or percentages; if you don't have a number, say so. Be concise and friendly. Never promise returns or give a guaranteed call. For anything actionable, remind that this is a research aid, not SEBI-registered advice, and to verify independently. Prefer short paragraphs and bullet points.`;
@@ -517,11 +534,15 @@ function aiRender() {
   const p = $("#aipanel"); p.hidden = false;
   const closeBtns = `<button class="x" title="Close" onclick="aiClose()">×</button>`;
   if (!AI.key()) {
+    const prov = AI.provider(), cfg = AI.cfg();
     p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b>${closeBtns}</div>
-      <div class="aimsgs"><div class="amsg a">Hi! I can explain any screen, teach stock-market concepts (basic to advanced), and interpret the app's numbers.
-      <br><br>To turn me on, paste your <b>Anthropic API key</b> (from console.anthropic.com). It's stored only on this device and never uploaded. The API bills per use (usually a few paise per question).</div></div>
-      <div class="ainput"><input id="aikey" type="password" placeholder="sk-ant-..."><button onclick="aiSaveKey()">Save</button></div>
-      <div style="text-align:center;padding:0 0 12px"><button class="sec" style="background:var(--chip);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer" onclick="aiClose()">Maybe later</button></div>`;
+      <div class="aimsgs"><div class="amsg a">Hi! I explain any screen, teach stock-market concepts (basic to advanced), and interpret the app's numbers.
+      <br><br>Pick a <b>free</b> AI provider and paste its key (no card needed). It's stored only on this device and never uploaded.</div>
+      <div class="amsg a">Recommended: <b>OpenRouter</b> or <b>Groq</b> — free, open-source Llama models. Get a free key at <b>${esc(cfg.keyUrl)}</b>.</div></div>
+      <div style="padding:0 14px 8px"><select id="aiprov" onchange="aiPickProvider(this.value)" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit">
+        ${Object.entries(AI_PROVIDERS).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select></div>
+      <div class="ainput"><input id="aikey" type="password" placeholder="${esc(cfg.keyHint)}"><button onclick="aiSaveKey()">Save</button></div>
+      <div style="text-align:center;padding:0 0 12px"><button style="background:var(--chip);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer" onclick="aiClose()">Maybe later</button></div>`;
     return;
   }
   const chips = (QUICK[tab] || QUICK._default);
@@ -532,13 +553,35 @@ function aiRender() {
     <div class="ainput"><input id="aiq" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'){aiSend(this.value);this.value=''}"><button onclick="var i=document.getElementById('aiq');aiSend(i.value);i.value=''">Send</button></div>`;
   const m = $("#aimsgs"); m.scrollTop = m.scrollHeight;
 }
-function aiSaveKey() { const k = $("#aikey").value.trim(); if (k) { LS.set("anthropic_key", k); aiRender(); } }
+function aiPickProvider(p) { LS.set("ai_provider", p); aiRender(); }
+function aiSaveKey() { const k = $("#aikey").value.trim(); if (k) { LS.set("ai_key_" + AI.provider(), k); aiRender(); } }
 function aiSettings() {
-  const cur = AI.model();
-  const k = prompt("AI model (claude-sonnet-5-5 = balanced, claude-haiku-5-5 = cheapest, claude-opus-5-5 = best):", cur);
-  if (k) LS.set("ai_model", k.trim());
-  if (confirm("Clear your saved API key from this device?")) { localStorage.removeItem("anthropic_key"); AI.history = []; }
+  const m = prompt("Model for " + AI.cfg().label + " (blank = default " + AI.cfg().model + "):", AI.model());
+  if (m !== null) { if (m.trim()) LS.set("ai_model_" + AI.provider(), m.trim()); else localStorage.removeItem("ai_model_" + AI.provider()); }
+  if (confirm("Also clear your saved API key from this device?")) { localStorage.removeItem("ai_key_" + AI.provider()); AI.history = []; }
   aiRender();
+}
+async function aiCall(messages, sys) {
+  const cfg = AI.cfg(), key = AI.key(), model = AI.model();
+  if (cfg.kind === "anthropic") {
+    const r = await fetch(cfg.url, { method: "POST", headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model, max_tokens: 900, system: sys, messages }) });
+    const j = await r.json(); if (!r.ok) throw new Error((j.error && j.error.message) || "error " + r.status);
+    return j.content[0].text;
+  }
+  if (cfg.kind === "gemini") {
+    const url = `${cfg.url}/${model}:generateContent?key=${encodeURIComponent(key)}`;
+    const contents = messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ system_instruction: { parts: [{ text: sys }] }, contents, generationConfig: { maxOutputTokens: 900 } }) });
+    const j = await r.json(); if (!r.ok) throw new Error((j.error && j.error.message) || "error " + r.status);
+    return j.candidates[0].content.parts.map(p => p.text).join("");
+  }
+  // openai-compatible (OpenRouter, Groq)
+  const r = await fetch(cfg.url, { method: "POST", headers: { "content-type": "application/json", "authorization": "Bearer " + key, "HTTP-Referer": location.origin, "X-Title": "Market Tracker" },
+    body: JSON.stringify({ model, max_tokens: 900, messages: [{ role: "system", content: sys }, ...messages] }) });
+  const j = await r.json(); if (!r.ok) throw new Error((j.error && (j.error.message || j.error)) || "error " + r.status);
+  return j.choices[0].message.content;
 }
 async function aiSend(text) {
   text = (text || "").trim(); if (!text || !AI.key()) return;
@@ -546,18 +589,11 @@ async function aiSend(text) {
   const msgs = $("#aimsgs"); const bubble = document.createElement("div"); bubble.className = "amsg a"; bubble.textContent = "…"; msgs.appendChild(bubble); msgs.scrollTop = msgs.scrollHeight;
   try {
     const sys = TUTOR + "\n\nCONTEXT (computed app data for the user's current screen):\n" + JSON.stringify(aiContext());
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": AI.key(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: AI.model(), max_tokens: 900, system: sys,
-        messages: AI.history.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })) }),
-    });
-    const j = await res.json();
-    if (!res.ok) throw new Error(j.error ? j.error.message : "API error " + res.status);
-    const txt = (j.content && j.content[0] && j.content[0].text) || "(no reply)";
-    AI.history.push({ role: "assistant", text: txt });
+    const msgsArr = AI.history.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
+    const txt = await aiCall(msgsArr, sys);
+    AI.history.push({ role: "assistant", text: txt || "(no reply)" });
   } catch (e) {
-    AI.history.push({ role: "assistant", text: "⚠ " + e.message + (/401|authentication/i.test(e.message) ? " — check your API key in ⚙ settings." : "") });
+    AI.history.push({ role: "assistant", text: "⚠ " + e.message + (/401|403|auth|invalid/i.test(e.message) ? " — check your key/provider in ⚙." : "") });
   }
   aiRender();
 }
