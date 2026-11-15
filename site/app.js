@@ -499,18 +499,33 @@ const QUICK = {
   backtest: ["Is this strategy good? Explain the numbers", "What is expectancy and win rate?"],
   _default: ["Explain this screen", "Teach me a stock-market basic", "What is RSI?"],
 };
-function aiToggle() { const p = $("#aipanel"); p.hidden ? aiRender() : (p.hidden = true); }
+function aiClose() {
+  $("#aipanel").hidden = true;
+  document.body.classList.remove("ai-open");
+  const b = document.getElementById("aiback"); if (b) b.remove();
+}
+function aiToggle() { $("#aipanel").hidden ? aiOpen() : aiClose(); }
+function aiOpen() {
+  if (!document.getElementById("aiback")) {
+    const b = document.createElement("div"); b.id = "aiback"; b.className = "aiback"; b.onclick = aiClose;
+    document.body.appendChild(b);
+  }
+  document.body.classList.add("ai-open");
+  aiRender();
+}
 function aiRender() {
   const p = $("#aipanel"); p.hidden = false;
+  const closeBtns = `<button class="x" title="Close" onclick="aiClose()">×</button>`;
   if (!AI.key()) {
-    p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><button class="x" onclick="document.getElementById('aipanel').hidden=true">×</button></div>
+    p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b>${closeBtns}</div>
       <div class="aimsgs"><div class="amsg a">Hi! I can explain any screen, teach stock-market concepts (basic to advanced), and interpret the app's numbers.
       <br><br>To turn me on, paste your <b>Anthropic API key</b> (from console.anthropic.com). It's stored only on this device and never uploaded. The API bills per use (usually a few paise per question).</div></div>
-      <div class="ainput"><input id="aikey" type="password" placeholder="sk-ant-..."><button onclick="aiSaveKey()">Save</button></div>`;
+      <div class="ainput"><input id="aikey" type="password" placeholder="sk-ant-..."><button onclick="aiSaveKey()">Save</button></div>
+      <div style="text-align:center;padding:0 0 12px"><button class="sec" style="background:var(--chip);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer" onclick="aiClose()">Maybe later</button></div>`;
     return;
   }
   const chips = (QUICK[tab] || QUICK._default);
-  p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><span style="flex:1"></span><button class="x" title="Settings" onclick="aiSettings()">⚙</button><button class="x" onclick="document.getElementById('aipanel').hidden=true">×</button></div>
+  p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><span style="flex:1"></span><button class="x" title="Settings" onclick="aiSettings()">⚙</button>${closeBtns}</div>
     <div class="aimsgs" id="aimsgs">${AI.history.length ? "" : `<div class="amsg a">Ask me about the <b>${esc(tab)}</b> screen, or any market concept.</div>`}
     ${AI.history.map(m => `<div class="amsg ${m.role === "user" ? "u" : "a"}">${esc(m.text)}</div>`).join("")}</div>
     <div class="chips">${chips.map(q => `<button onclick="aiSend(this.textContent)">${esc(q)}</button>`).join("")}</div>
