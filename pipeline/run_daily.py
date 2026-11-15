@@ -221,7 +221,7 @@ def main():
     for t in top5:
         print(f"  {t['kind']:12} {t['name']:38} score {t['score']:5.1f}  {t['signal']}")
     if not args.no_notify:
-        send_daily_notification(now, regime, breadth, modes, top5, brief)
+        send_daily_notification(now, regime, breadth, modes, top5, brief, funds)
 
 
 def build_ai_brief(now, regime, breadth, overview, modes):
@@ -251,36 +251,48 @@ def build_ai_brief(now, regime, breadth, overview, modes):
         return None
 
 
-def send_daily_notification(now, regime, breadth, modes, top5, brief):
-    """One daily push with BOTH shortlists (trading + investing) and a plain-language why."""
-    head = f"Markets: {regime}" + (f" · {breadth:.0%} of stocks above 200-DMA" if breadth is not None else "")
+def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None):
+    """Two daily pushes for the Indian market: a morning 'market open' alert and an evening
+    'market closed' update, each with Indian stock shortlists (trading + investing) + top mutual funds."""
+    is_open = now.hour < 12  # morning run ~09:15 IST = market open; evening ~17:00 = market closed
+    when = "Market OPEN" if is_open else "Market CLOSED"
+    title = f"{when} - {now:%d %b}"
+    head = f"{when} · {regime}" + (f" · {breadth:.0%} of Indian stocks above their 200-day avg" if breadth is not None else "")
     lines = [head]
+    if is_open:
+        lines.append("Today's shortlist for Indian stocks & funds:")
+    else:
+        lines.append("End-of-day update — tomorrow's shortlist:")
     if brief and brief.get("brief"):
-        lines.append("")
-        lines.append(brief["brief"])
+        lines.append(""); lines.append(brief["brief"])
     treasons = (brief or {}).get("trading_reasons", {})
     ireasons = (brief or {}).get("investing_reasons", {})
     tt = (modes or {}).get("trading_top5", [])
     it = (modes or {}).get("investing_top5", [])
     if tt:
-        lines.append("")
-        lines.append("⚡ TRADING shortlist (swing):")
+        lines.append(""); lines.append("TRADING (short-term, Indian stocks):")
         for r in tt[:5]:
             why = treasons.get(r["symbol"]) or f"{r.get('trading_verdict_txt', 'setup')}"
-            upto = f" (buy ≤ ₹{r['trading_buy_upto']:.0f})" if r.get("trading_buy_upto") else ""
-            lines.append(f"• {r['name']}{upto} — {why}")
+            upto = f" (buy up to Rs {r['trading_buy_upto']:.0f})" if r.get("trading_buy_upto") else ""
+            lines.append(f"- {r['name']}{upto} - {why}")
     if it:
-        lines.append("")
-        lines.append("◈ INVESTING shortlist (long-term):")
+        lines.append(""); lines.append("INVESTING (long-term, Indian stocks):")
         for r in it[:5]:
             why = ireasons.get(r["symbol"]) or f"{r.get('investing_verdict_txt', 'quality + trend')}"
-            lines.append(f"• {r['name']} — {why}")
-    if not tt and not it:  # fallback to the legacy Top 5 if dual-mode isn't ready yet
+            upto = f" (buy up to Rs {r['trading_buy_upto']:.0f})" if r.get("trading_buy_upto") else ""
+            lines.append(f"- {r['name']} - {why}")
+    # top mutual funds (diversified by category)
+    tf = _distinct_category(funds or [])[:4]
+    if tf:
+        lines.append(""); lines.append("MUTUAL FUNDS (SIP/accumulate):")
+        for f in tf:
+            cagr = (f.get("cagr_3y") or f.get("ret_1y") or 0) * 100
+            lines.append(f"- {f['name'].split(' - ')[0]} - 3Y return {cagr:.0f}%/yr")
+    if not tt and not it and not tf:  # fallback
         for i, t in enumerate(top5, 1):
             lines.append(f"{i}. {t['name']} [{t['kind']}] {t['signal']}")
-    lines.append("")
-    lines.append(DISCLAIMER)
-    sent = N.send_all(f"Daily shortlist - {now:%d %b}", "\n".join(lines), SITE_URL or None)
+    lines.append(""); lines.append(DISCLAIMER)
+    sent = N.send_all(title, "\n".join(lines), SITE_URL or None)
     print("Notified via:", sent or "nothing (no channel configured)")
 
 
