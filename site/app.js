@@ -482,7 +482,7 @@ const AI_PROVIDERS = {
   groq: { label: "Groq (free, fast, Llama)", url: "https://api.groq.com/openai/v1/chat/completions", kind: "openai",
     model: "llama-3.3-70b-versatile", keyUrl: "console.groq.com/keys", keyHint: "gsk_... (free, no card)" },
   gemini: { label: "Google Gemini (free)", url: "https://generativelanguage.googleapis.com/v1beta/models", kind: "gemini",
-    model: "gemini-2.0-flash", keyUrl: "aistudio.google.com/apikey", keyHint: "AIza... (free, no card)" },
+    model: "gemini-flash-latest", keyUrl: "aistudio.google.com/apikey", keyHint: "AIza... (free, no card)" },
   anthropic: { label: "Anthropic Claude (paid)", url: "https://api.anthropic.com/v1/messages", kind: "anthropic",
     model: "claude-sonnet-5-5", keyUrl: "console.anthropic.com", keyHint: "sk-ant-... (needs payment)" },
 };
@@ -516,10 +516,12 @@ const QUICK = {
   backtest: ["Is this strategy good? Explain the numbers", "What is expectancy and win rate?"],
   _default: ["Explain this screen", "Teach me a stock-market basic", "What is RSI?"],
 };
+function _aiEsc(ev) { if (ev.key === "Escape") aiClose(); }
 function aiClose() {
   $("#aipanel").hidden = true;
   document.body.classList.remove("ai-open");
   const b = document.getElementById("aiback"); if (b) b.remove();
+  document.removeEventListener("keydown", _aiEsc);
 }
 function aiToggle() { $("#aipanel").hidden ? aiOpen() : aiClose(); }
 function aiOpen() {
@@ -528,6 +530,7 @@ function aiOpen() {
     document.body.appendChild(b);
   }
   document.body.classList.add("ai-open");
+  document.addEventListener("keydown", _aiEsc);
   aiRender();
 }
 function aiRender() {

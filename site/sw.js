@@ -1,7 +1,7 @@
 // Service worker: makes the app installable and usable offline.
 // Strategy: NETWORK-FIRST for everything (always load the newest code/data when online; fall back to
 // cache only when offline). This prevents the app ever getting stuck on a stale cached build.
-const SHELL = "mt-shell-v8";
+const SHELL = "mt-shell-v9";
 const SHELL_FILES = ["./", "./index.html", "./style.css", "./app.js", "./manifest.json",
   "./icon-192.png", "./icon-512.png"];
 

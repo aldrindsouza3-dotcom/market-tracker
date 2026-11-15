@@ -35,7 +35,7 @@ def _provider():
                 e("AI_MODEL", "llama-3.3-70b-versatile"))
     if e("GEMINI_API_KEY"):
         return ("gemini", "https://generativelanguage.googleapis.com/v1beta/models", e("GEMINI_API_KEY"),
-                e("AI_MODEL", "gemini-2.0-flash"))
+                e("AI_MODEL", "gemini-flash-latest"))
     if e("ANTHROPIC_API_KEY"):
         return ("anthropic", "https://api.anthropic.com/v1/messages", e("ANTHROPIC_API_KEY"),
                 e("AI_MODEL", "claude-haiku-5-5"))
