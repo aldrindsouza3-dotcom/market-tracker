@@ -4,3 +4,4 @@ __pycache__/
 VAPID_PRIVATE_KEY.txt
 push_subscription.txt
 cache/
+site/data/stocks/

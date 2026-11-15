@@ -195,6 +195,11 @@ def main():
     (OUT / "latest.json").write_text(json.dumps(clean(out), indent=1), encoding="utf-8")
 
     build_full_universe(now)  # whole-market searchable index + liquidity gate (safe, isolated)
+    try:
+        import build_stocks
+        build_stocks.build(now)   # dual Trading/Investing scoring + per-symbol detail + chart reading
+    except Exception as _ex:
+        print("  ! dual-mode build skipped:", str(_ex)[:140])
     append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec)
     update_track_record(now, top5, px)
 

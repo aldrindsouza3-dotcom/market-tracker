@@ -1,0 +1,173 @@
+"""Phase 1b/2/3/5 builder: full eligible-universe dual scoring + per-symbol detail files + chart reading.
+
+Called by run_daily. Isolated and defensive: any failure prints and returns without breaking the main run.
+Writes:
+  site/data/stocks/<SYMBOL>.json   per-symbol detail (compact OHLCV for charts, indicators, both scores,
+                                   trading & investing plans, rule-based chart reading, fundamentals, links)
+  site/data/stocks_index.json      eligible universe with both scores/signals/verdicts (for Trading/Investing tabs + screeners)
+  site/data/modes.json             dual Top-5 (trading + investing) for the Today/mode tabs
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import math
+from pathlib import Path
+
+import pandas as pd
+
+import nse
+import scoring as SC
+import store
+
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "site" / "data"
+STOCKS = OUT / "stocks"
+FUND_CACHE = nse.CACHE / "fundamentals.json"
+
+SEED_PER_RUN = 180      # new symbols to seed history for, per run (spreads Yahoo load; Actions cache persists)
+FUND_PER_RUN = 70       # fundamentals refreshed per run (weekly cadence per symbol)
+TOP_N = 450             # most-liquid eligible symbols to score in full this phase
+
+
+def _clean(o):
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_clean(v) for v in o]
+    if isinstance(o, float) and (math.isnan(o) or math.isinf(o)):
+        return None
+    return o
+
+
+def _load_fund_cache() -> dict:
+    try:
+        return json.loads(FUND_CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _refresh_fundamentals(symbols: list[str], cache: dict, now_iso: str, limit: int) -> None:
+    import yfinance as yf
+    stale = [s for s in symbols if (now_iso[:10] >
+             (cache.get(s, {}).get("asof", "0000")[:10] if s in cache else "0000"))]
+    # oldest first; cap per run
+    stale.sort(key=lambda s: cache.get(s, {}).get("asof", ""))
+    for s in stale[:limit]:
+        try:
+            i = yf.Ticker(f"{s}.NS").info or {}
+            cache[s] = {"pe": i.get("trailingPE"), "fwd_pe": i.get("forwardPE"), "roe": i.get("returnOnEquity"),
+                        "debt_equity": i.get("debtToEquity"), "rev_growth": i.get("revenueGrowth"),
+                        "profit_margin": i.get("profitMargins"), "div_yield": i.get("dividendYield"),
+                        "market_cap": i.get("marketCap"), "sector": i.get("sector"), "asof": now_iso}
+        except Exception:
+            pass
+    try:
+        FUND_CACHE.write_text(json.dumps(cache), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _compact_ohlc(df: pd.DataFrame, max_rows: int = 1300) -> dict:
+    d = df.tail(max_rows)
+    r2 = lambda s: [None if pd.isna(x) else round(float(x), 2) for x in s]
+    return {"t": [x for x in d["date"]], "o": r2(d["open"]), "h": r2(d["high"]),
+            "l": r2(d["low"]), "c": r2(d["close"]), "v": [None if pd.isna(x) else int(x) for x in d["volume"]],
+            "dp": [None if pd.isna(x) else round(float(x), 1) for x in d["deliv_pct"]] if "deliv_pct" in d else []}
+
+
+def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | None:
+    try:
+        STOCKS.mkdir(parents=True, exist_ok=True)
+        s = nse.session()
+        recent = nse.recent_bhavcopies(22, s)
+        if not recent:
+            print("  ! stocks: no bhavcopy; skipping dual-mode build")
+            return None
+        asof, latest = recent[0]
+        sec = nse.securities(s)
+        uni = universe_rows or nse.build_universe(recent, sec)
+        eligible = [u for u in uni if u["eligible"]][:TOP_N]
+        elig_syms = [u["symbol"] for u in eligible]
+
+        # 1) maintain history: seed new symbols (bounded), append today's bhav to all cached
+        seeded = store.seed_from_yahoo(elig_syms, SEED_PER_RUN)
+        added = store.append_bhav_day(latest)
+        print(f"  history: seeded {seeded} new, appended today to {added} symbols")
+
+        # 2) fundamentals (weekly cadence, bounded)
+        fcache = _load_fund_cache()
+        _refresh_fundamentals(elig_syms, fcache, now.isoformat(), FUND_PER_RUN)
+
+        # 3) score each eligible symbol that has history
+        index_rows, scored = [], 0
+        meta = {u["symbol"]: u for u in uni}
+        for sym in elig_syms:
+            h = store.load(sym)
+            if h is None or len(h) < 60:
+                continue
+            ohlc = store.to_ohlc(h)
+            t = SC.indicators(ohlc)
+            if not t:
+                continue
+            f = fcache.get(sym)
+            tscore = SC.trading_score(t)
+            iscore, had_f = SC.investing_score(t, f)
+            tplan = SC.trading_plan(t, tscore)
+            iplan = SC.investing_plan(t, f, iscore)
+            reading = SC.chart_reading(ohlc, t)
+            u = meta.get(sym, {})
+            row = {"symbol": sym, "name": u.get("name", sym), "sector": (f or {}).get("sector"),
+                   "close": round(t["price"], 2), "day_change": t["day_change"],
+                   "trading_score": tscore, "investing_score": iscore,
+                   "trading_verdict": tplan["verdict_class"], "investing_verdict": iplan["verdict_class"],
+                   "rsi": round(t["rsi"], 0), "ret_1y": t["ret_1y"], "days": t["days"],
+                   "med_turnover_cr": u.get("med_turnover_cr"), "has_fundamentals": had_f}
+            index_rows.append(row)
+            # per-symbol detail file
+            detail = {"symbol": sym, "name": u.get("name", sym), "asof": asof.isoformat(),
+                      "source": "NSE bhavcopy + Yahoo (history)", "eligible": True,
+                      "price": round(t["price"], 2), "day_change": t["day_change"], "days_history": t["days"],
+                      "indicators": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in t.items()},
+                      "trading": {"score": tscore, **tplan}, "investing": {"score": iscore, "has_fundamentals": had_f, **iplan},
+                      "reading": reading, "fundamentals": f,
+                      "links": {"tickertape": u.get("tickertape"), "screener": u.get("screener"), "moneycontrol": u.get("moneycontrol")},
+                      "ohlc": _compact_ohlc(h),
+                      "disclaimer": "Research aid, not investment advice. End-of-day data."}
+            (STOCKS / f"{sym}.json").write_text(json.dumps(_clean(detail)), encoding="utf-8")
+            scored += 1
+
+        (OUT / "stocks_index.json").write_text(json.dumps(_clean({
+            "generated_at": now.isoformat(), "asof": asof.isoformat(), "count": len(index_rows),
+            "universe_total": len(uni), "eligible_total": sum(1 for u in uni if u["eligible"]),
+            "note": f"Top {TOP_N} most-liquid eligible stocks scored in full; more each run as history seeds.",
+            "rows": index_rows})), encoding="utf-8")
+
+        # 4) dual Top-5 (diversified by sector where possible)
+        def top5(key, verdict_key):
+            cand = [r for r in index_rows if r[verdict_key] in ("buy", "dip")]
+            cand.sort(key=lambda r: -r[key])
+            out, seen = [], set()
+            for r in cand:
+                sec_k = r.get("sector") or r["symbol"]
+                if sec_k in seen and len(out) < 5:
+                    continue
+                seen.add(sec_k); out.append(r)
+                if len(out) >= 5:
+                    break
+            if len(out) < 5:
+                out += [r for r in cand if r not in out][:5 - len(out)]
+            return out[:5]
+
+        modes = {"generated_at": now.isoformat(), "asof": asof.isoformat(),
+                 "trading_top5": top5("trading_score", "trading_verdict"),
+                 "investing_top5": top5("investing_score", "investing_verdict"),
+                 "scored": scored}
+        (OUT / "modes.json").write_text(json.dumps(_clean(modes), encoding="utf-8" and None) if False else json.dumps(_clean(modes)), encoding="utf-8")
+        print(f"  dual-mode: scored {scored} stocks; trading & investing Top-5 written")
+        return modes
+    except Exception as ex:
+        import traceback
+        print("  ! build_stocks failed (non-fatal):", str(ex)[:160])
+        traceback.print_exc()
+        return None
