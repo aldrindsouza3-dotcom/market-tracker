@@ -275,7 +275,7 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief):
             lines.append(f"{i}. {t['name']} [{t['kind']}] {t['signal']}")
     lines.append("")
     lines.append(DISCLAIMER)
-    sent = N.send_all(f"Daily shortlist — {now:%d %b}", "\n".join(lines), SITE_URL or None)
+    sent = N.send_all(f"Daily shortlist - {now:%d %b}", "\n".join(lines), SITE_URL or None)
     print("Notified via:", sent or "nothing (no channel configured)")
 
 

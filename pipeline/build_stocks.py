@@ -71,8 +71,9 @@ def _refresh_fundamentals(symbols: list[str], cache: dict, now_iso: str, limit: 
 def _compact_ohlc(df: pd.DataFrame, max_rows: int = 1300) -> dict:
     d = df.tail(max_rows)
     r2 = lambda s: [None if pd.isna(x) else round(float(x), 2) for x in s]
-    return {"t": [x for x in d["date"]], "o": r2(d["open"]), "h": r2(d["high"]),
-            "l": r2(d["low"]), "c": r2(d["close"]), "v": [None if pd.isna(x) else int(x) for x in d["volume"]],
+    vint = lambda x: None if (pd.isna(x) or not pd.api.types.is_number(x)) else int(round(float(x)))
+    return {"t": [str(x) for x in d["date"]], "o": r2(d["open"]), "h": r2(d["high"]),
+            "l": r2(d["low"]), "c": r2(d["close"]), "v": [vint(x) for x in d["volume"]],
             "dp": [None if pd.isna(x) else round(float(x), 1) for x in d["deliv_pct"]] if "deliv_pct" in d else []}
 
 
@@ -103,6 +104,7 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
         index_rows, scored = [], 0
         meta = {u["symbol"]: u for u in uni}
         for sym in elig_syms:
+          try:
             h = store.load(sym)
             if h is None or len(h) < 60:
                 continue
@@ -141,6 +143,9 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
                       "disclaimer": "Research aid, not investment advice. End-of-day data."}
             (STOCKS / f"{sym}.json").write_text(json.dumps(_clean(detail)), encoding="utf-8")
             scored += 1
+          except Exception as _ex:
+            print(f"  . skip {sym}: {str(_ex)[:80]}")
+            continue
 
         (OUT / "stocks_index.json").write_text(json.dumps(_clean({
             "generated_at": now.isoformat(), "asof": asof.isoformat(), "count": len(index_rows),

@@ -81,7 +81,9 @@ def send_all(title: str, body: str, url: str | None = None) -> list[str]:
     _web_push(title, body, url, sent)
     if e("NTFY_TOPIC"):
         try:
-            h = {"Title": title.encode("utf-8")[:250].decode("utf-8", "ignore"), "Priority": "default"}
+            # HTTP headers must be latin-1; strip anything that isn't (em-dash, emoji) from the Title.
+            safe_title = title.encode("ascii", "ignore").decode("ascii")[:250] or "Market Tracker"
+            h = {"Title": safe_title, "Priority": "default", "Markdown": "no"}
             if url:
                 h["Click"] = url
             requests.post(f"https://ntfy.sh/{e('NTFY_TOPIC')}", data=body.encode("utf-8"), headers=h, timeout=20).raise_for_status()
