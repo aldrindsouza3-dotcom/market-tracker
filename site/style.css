@@ -91,14 +91,14 @@ footer{padding:24px 16px 40px}
 .star.on{color:#f5b301}
 
 /* AI assistant */
-#aifab{position:fixed;right:16px;bottom:78px;width:52px;height:52px;border-radius:50%;border:0;background:linear-gradient(135deg,#6366f1,#2dd4bf);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:45}
+#aifab{position:fixed;right:16px;bottom:78px;width:52px;height:52px;border-radius:50%;border:0;background:linear-gradient(135deg,#6366f1,#2dd4bf);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:75}
 @media(min-width:761px){#aifab{bottom:24px}}
 /* on desktop keep the ✨ as a visible toggle (tap to minimise); on mobile the sheet covers it, use the header – / × */
 @media(max-width:760px){body.ai-open #aifab{display:none}}
 .aipanel .ahead .x{font-size:22px;line-height:1;padding:4px 8px}
-.aiback{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+.aiback{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:80}
 .aipanel[hidden]{display:none !important}
-.aipanel{position:fixed;z-index:61;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;
+.aipanel{position:fixed;z-index:81;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;
   right:16px;bottom:88px;width:min(420px,calc(100vw - 32px));height:min(560px,70vh);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 @media(max-width:760px){
   .aipanel{left:0;right:0;bottom:0;width:100%;height:85vh;max-height:85vh;border-radius:18px 18px 0 0}

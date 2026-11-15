@@ -344,15 +344,16 @@ function renderStock(el, d) {
       <button class="star ${star}" id="star" title="Watchlist">${star ? "★" : "☆"}</button></div>
 
     <div class="grid" style="margin-top:10px">
-      <div class="mode-card trade"><span class="mode-tag trade">Trading</span> <span class="muted">score ${T.score}</span>
+      <div class="mode-card trade"><span class="mode-tag trade">Trading</span> <span class="muted">score ${T.score} · for short-term (days–weeks)</span>
         <div class="vd ${T.verdict_class}" style="margin:6px 0">${esc(T.verdict)}</div>
-        <div class="lvl"><span>Good to buy up to</span><span>${T.buy_upto ? "₹" + num(T.buy_upto) : "—"}</span><span>Entry zone</span><span>₹${num(T.entry_low)}–${num(T.entry_high)}</span>
-        <span>Stop-loss</span><span class="down">₹${num(T.stop_loss)}</span><span>Targets</span><span class="up">₹${num(T.target_1)} / ${num(T.target_2)}</span>
-        <span>Risk:reward</span><span>${T.risk_reward || "–"} · time-stop ${T.time_stop_days}d</span></div>
+        <div class="lvl"><span>Current price</span><span><b>${cur}${num(d.price)}</b></span><span>Good to buy up to</span><span>${T.buy_upto ? cur + num(T.buy_upto) : "—"}</span><span>Entry zone</span><span>${cur}${num(T.entry_low)}–${num(T.entry_high)}</span>
+        <span>Stop-loss</span><span class="down">${cur}${num(T.stop_loss)}</span><span>Targets</span><span class="up">${cur}${num(T.target_1)} / ${num(T.target_2)}</span>
+        <span>Risk:reward</span><span>${T.risk_reward || "–"} · exit if neither hit in ${T.time_stop_days} days</span></div>
         <div class="muted" style="font-size:12px;margin-top:6px">${esc(T.gap_rule)} ${esc(T.applies)}</div></div>
-      <div class="mode-card invest"><span class="mode-tag invest">Investing</span> <span class="muted">score ${I.score}</span>
+      <div class="mode-card invest"><span class="mode-tag invest">Investing</span> <span class="muted">score ${I.score} · for long-term (months–years)</span>
         <div class="vd ${I.verdict_class}" style="margin:6px 0">${esc(I.verdict)}</div>
-        <div class="muted" style="font-size:13px">${esc(I.entry_style)}<br>${esc(I.thesis_broken_if)}<br>${esc(I.review)}</div></div>
+        <div class="lvl"><span>Current price</span><span><b>${cur}${num(d.price)}</b></span><span>Good to buy up to</span><span class="up">${I.buy_upto ? cur + num(I.buy_upto) : "—"}</span>${I.tranches && I.tranches.length > 1 ? `<span>Staggered buys</span><span>${I.tranches.map(x => cur + num(x, 0)).join(" → ")}</span>` : ""}</div>
+        <div class="muted" style="font-size:13px;margin-top:6px">${esc(I.entry_style)}<br><br>${esc(I.thesis_broken_if)}<br>${esc(I.review)}</div></div>
     </div>
 
     <div class="chartbox">

@@ -149,17 +149,27 @@ def investing_plan(t: dict, f: dict | None, score: float) -> dict:
         verdict, vclass = "WATCH — wait for a better price or confirmation", "wait"
     else:
         verdict, vclass = "AVOID for now", "wait"
-    # staggered if extended above 200DMA, lump if near/below it
+    # concrete buy prices (investing isn't price-sensitive, so "buy up to" sits a little above the current price)
+    buy_upto = round(p * 1.02, 2)
     if dist200 > 0.12:
-        entry_style = "Stagger in 3 tranches (now / −5% / −10%) — it's well above its 200-day average."
+        tranches = [round(p, 2), round(p * 0.95, 2), round(p * 0.90, 2)]
+        entry_style = (f"It's {dist200 * 100:.0f}% above its 200-day average, so it's a bit extended. Rather than buying all at once, "
+                       f"split your money into 3 equal parts: buy the first now (up to Rs {buy_upto:,.0f}), the second if it dips to "
+                       f"around Rs {tranches[1]:,.0f}, and the third near Rs {tranches[2]:,.0f}. This averages your cost and lowers timing risk.")
     elif dist200 < -0.05:
-        entry_style = "Reasonable lump-sum zone — near/below its 200-day average (confirm quality)."
+        tranches = [round(p, 2)]
+        entry_style = (f"It's trading near or below its 200-day average (a calmer entry zone), so a one-time lump-sum purchase up to "
+                       f"Rs {buy_upto:,.0f} is reasonable — provided the quality numbers below hold up.")
     else:
-        entry_style = "Stagger in 2 tranches (now / on a dip)."
-    broken = f"Thesis broken if it closes below Rs {round(min(s200, p * 0.85)):,} or fundamentals deteriorate (ROE/growth fall, debt rises)."
-    return {"verdict": verdict, "verdict_class": vclass, "entry_style": entry_style,
-            "thesis_broken_if": broken, "review": "Review in ~90 days or at next results.",
-            "applies": "Long-term view; price levels are guides, not tight stops."}
+        tranches = [round(p, 2), round(p * 0.95, 2)]
+        entry_style = (f"Split into 2 parts: buy the first now (up to Rs {buy_upto:,.0f}) and the second on a dip to around "
+                       f"Rs {tranches[1]:,.0f}.")
+    broken = (f"Sell/rethink if it closes below Rs {round(min(s200, p * 0.85)):,} (its long-term floor) for several days, "
+              f"or if the business weakens — ROE or growth falling, or debt rising.")
+    return {"verdict": verdict, "verdict_class": vclass, "current_price": round(p, 2),
+            "buy_upto": buy_upto, "tranches": tranches, "entry_style": entry_style,
+            "thesis_broken_if": broken, "review": "Review in about 3 months or after the next results.",
+            "applies": "This is a long-term view (months to years); the prices are guides for entry, not tight day-trading stops."}
 
 
 # ---------------- rule-based fundamental analysis (for investing) ----------------
@@ -228,24 +238,34 @@ def chart_reading(df: pd.DataFrame, t: dict, levels: dict | None = None) -> dict
     """Plain-language, rule-derived reading. Every line carries its numbers."""
     c = df["Close"]
     p = t["price"]
-    def trend(sma, label):
+
+    def trend(sma, horizon, win_desc):
         if np.isnan(sma):
-            return f"{label}: not enough history"
+            return f"{horizon}: not enough price history yet."
         d = (p / sma - 1) * 100
-        word = "up" if p > sma else "down"
-        return f"{label}: {word} — price Rs {p:,.0f} is {abs(d):.1f}% {'above' if p>sma else 'below'} the {label.split()[0]} average (Rs {sma:,.0f})"
-    short = trend(t.get("sma20", float("nan")), "Short (20d)")
-    med = trend(t["sma50"], "Medium (50d)")
-    lng = trend(t["sma200"], "Long (200d)")
+        if p > sma:
+            return (f"{horizon} ({win_desc}): Uptrend. The current price (Rs {p:,.0f}) is {d:.0f}% above its {win_desc} "
+                    f"average (Rs {sma:,.0f}), which means buyers are in control and most people who bought recently are in profit.")
+        return (f"{horizon} ({win_desc}): Downtrend. The current price (Rs {p:,.0f}) is {abs(d):.0f}% below its {win_desc} "
+                f"average (Rs {sma:,.0f}), which means sellers are in control and recent buyers are underwater.")
+    short = trend(t.get("sma20", float("nan")), "Short term", "20-day")
+    med = trend(t["sma50"], "Medium term", "50-day")
+    lng = trend(t["sma200"], "Long term", "200-day")
     # support/resistance from recent swing highs/lows
     win = c.tail(120)
     res = float(win.max()); sup = float(win.min())
     r = t["rsi"]
-    mom = f"RSI {r:.0f} ({'overbought' if r>70 else 'oversold' if r<30 else 'neutral'}); MACD {'bullish' if t['macd_hist']>0 else 'bearish'} ({t['macd_hist']:+.1f})"
+    rsi_state = "overbought (stretched, a pause or dip is common)" if r > 70 else "oversold (beaten down, a bounce is common)" if r < 30 else "healthy, with room to move either way"
+    macd_state = "positive, confirming upward momentum" if t['macd_hist'] > 0 else "negative, confirming downward momentum"
+    mom = (f"The current price is Rs {p:,.0f}. RSI is {r:.0f} — {rsi_state}. MACD momentum is {macd_state}.")
     dp = t.get("deliv_pct")
-    vol = f"Volume {t.get('vol_surge',1):.1f}x its 20-day average" + (f", delivery {dp:.0f}%" if dp is not None else "")
+    vs = t.get('vol_surge', 1)
+    vol_desc = "much heavier than usual (strong conviction behind the move)" if vs > 1.5 else "above average" if vs > 1.1 else "below average (quiet, less conviction)" if vs < 0.8 else "about normal"
+    vol = f"Today's trading volume is {vs:.1f}x its 20-day average — {vol_desc}." + (f" Delivery was {dp:.0f}% (higher delivery means more genuine investor buying vs quick intraday trading)." if dp is not None else "")
     bbw = t.get("bb_width")
-    vola = f"ATR {t['atr']/p*100:.1f}% of price" + (f"; Bollinger {'squeeze (low)' if bbw and bbw<0.08 else 'wide (volatile)' if bbw and bbw>0.2 else 'normal'}" if bbw else "")
+    atr_pct = t['atr'] / p * 100
+    squeeze = (" Its price band is unusually tight right now, which often comes before a big move." if bbw and bbw < 0.08 else " Its price band is wide, meaning swings are large at the moment." if bbw and bbw > 0.2 else "")
+    vola = f"It typically moves about {atr_pct:.1f}% per day (its 'normal' daily range) — {'calm' if atr_pct < 1.5 else 'volatile' if atr_pct > 3 else 'moderate'}.{squeeze}"
     events = []
     if not np.isnan(t["sma50"]) and not np.isnan(t["sma200"]):
         if t["sma50"] > t["sma200"] and (c.rolling(50).mean().iloc[-6] <= c.rolling(200).mean().iloc[-6]):
@@ -256,17 +276,20 @@ def chart_reading(df: pd.DataFrame, t: dict, levels: dict | None = None) -> dict
         events.append("At a 52-week low")
     if p > res * 0.995 and t.get("vol_surge", 1) > 1.3:
         events.append(f"Breaking out of its {len(win)}-day range (Rs {res:,.0f}) on higher volume")
-    # one-line summary + what to watch
+    # one-paragraph plain-English summary + what to watch next, always naming the current price
     if p > t["sma50"] and (np.isnan(t["sma200"]) or p > t["sma200"]):
-        summary = "Uptrend across medium and long term."
-        watch = f"A close above Rs {res:,.0f} extends it; below Rs {t['sma50']:,.0f} (50d) weakens it."
+        summary = (f"Overall: this is in a healthy uptrend at Rs {p:,.0f} — above both its medium- and long-term averages. "
+                   f"The path of least resistance is upward, though it has already run up, so buying on small dips is safer than chasing.")
+        watch = f"If it closes above Rs {res:,.0f} (its recent high) the uptrend extends. If it drops below Rs {t['sma50']:,.0f} (the 50-day average), momentum is weakening — be cautious."
     elif p < t["sma50"] and (not np.isnan(t["sma200"]) and p < t["sma200"]):
-        summary = "Downtrend — below both key averages."
-        watch = f"A close above Rs {t['sma50']:,.0f} (50d) would be the first repair sign; support near Rs {sup:,.0f}."
+        summary = (f"Overall: this is in a downtrend at Rs {p:,.0f} — below both key averages. Falling knives are risky; "
+                   f"it's usually better to wait for the trend to repair before buying.")
+        watch = f"The first sign of recovery is a close back above Rs {t['sma50']:,.0f} (the 50-day average). Nearby support (a likely floor) is around Rs {sup:,.0f}."
     else:
-        summary = "Mixed / transitional — signals conflict."
-        watch = f"Resistance Rs {res:,.0f}, support Rs {sup:,.0f}; a decisive close either side sets direction."
-    return {"short": short, "medium": med, "long": lng,
+        summary = (f"Overall: mixed signals at Rs {p:,.0f} — the short- and long-term trends disagree, so it's in a transition. "
+                   f"Best to wait for a clear direction rather than guess.")
+        watch = f"A decisive close above Rs {res:,.0f} turns it bullish; a close below Rs {sup:,.0f} turns it bearish. Until then, it's range-bound."
+    return {"short": short, "medium": med, "long": lng, "current_price": round(p, 2),
             "support": round(sup, 2), "resistance": round(res, 2),
             "momentum": mom, "volume": vol, "volatility": vola,
             "events": events, "summary": summary, "watch_next": watch}
