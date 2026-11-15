@@ -13,7 +13,7 @@ const watch = () => LS.get("watchlist") || [];
 const inWatch = s => watch().includes(s);
 const toggleWatch = s => { const w = watch(); const i = w.indexOf(s); i >= 0 ? w.splice(i, 1) : w.push(s); LS.set("watchlist", w); };
 
-const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investing"], ["overview", "Overview"], ["search", "All stocks"], ["watchlist", "Watchlist"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
+const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investing"], ["screener", "Screener"], ["overview", "Overview"], ["search", "All stocks"], ["watchlist", "Watchlist"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
 ["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["backtest", "Backtest"], ["news", "News"], ["how", "How it works"]];
 const BOTTOM = [["today", "Today", "★"], ["trading", "Trading", "⚡"], ["investing", "Investing", "◈"], ["markets", "Markets", "🌐"], ["more", "More", "☰"]];
 const SECTIONS = { markets: "metals", more: "search" };  // bottom-nav groups map to a starting tab
@@ -66,7 +66,7 @@ async function load() {
 }
 function go(t) { tab = t; history.replaceState(null, "", "#" + tab); window.scrollTo(0, 0); load2(); }
 function load2() {
-  const VIEWS = { today, trading, investing, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, backtest, news, how };
+  const VIEWS = { today, trading, investing, screener, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, backtest, news, how };
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
   const botActive = Object.keys(SECTIONS).find(k => SECTIONS[k] === tab) || tab;
   document.querySelectorAll("#bottomnav button").forEach(b => b.classList.toggle("on", b.dataset.t === botActive));
@@ -74,6 +74,7 @@ function load2() {
   wireTables();
   if (tab === "search") wireSearch();
   if (tab === "trading" || tab === "investing") wireModeTable();
+  if (tab === "screener") wireScreener();
 }
 
 function pickCard(p, i) {
@@ -397,6 +398,77 @@ function wireSearch() {
   q.oninput = render; onlyElig.onchange = render; noSme.onchange = render;
   render();
 }
+
+// ---------- Screener: build your own shortlist ----------
+const SCREENER_PRESETS = {
+  "Momentum (near 52w high)": { minTScore: 60, minRsi: 55, maxRsi: 72, signal: "buy" },
+  "Value (low P/E, high ROE)": { maxPe: 20, minRoe: 15, minIScore: 55 },
+  "Oversold in uptrend": { maxRsi: 40, minIScore: 50 },
+  "Volume breakout": { minVol: 1.5, minTScore: 55 },
+  "Quality growth": { minRoe: 15, minGrowth: 12, minIScore: 60 },
+};
+function screener() {
+  if (!IDX) return `<h2>Screener</h2><div class="card muted">The screener builds once the stock data has loaded.</div>`;
+  const sectors = [...new Set(IDX.rows.map(r => r.sector).filter(Boolean))].sort();
+  const f = LS.get("screener") || {};
+  const inp = (id, ph, val) => `<input id="${id}" type="number" placeholder="${ph}" value="${val ?? ""}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit">`;
+  return `<h2>Screener <span class="muted" style="font-size:13px">(${IDX.count} stocks across all sectors)</span></h2>
+    <p class="muted">Build your own shortlist across the whole scored market — not just large caps. Set any filters, or start from a preset.</p>
+    <div class="chips" style="padding:0 0 10px">${Object.keys(SCREENER_PRESETS).map(p => `<button onclick='applyPreset(${JSON.stringify(p)})'>${esc(p)}</button>`).join("")}</div>
+    <div class="card"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="muted" style="font-size:12px">Sector</label><select id="scSector" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit"><option value="">Any</option>${sectors.map(s => `<option ${f.sector === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+      <div><label class="muted" style="font-size:12px">Signal</label><select id="scSignal" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit"><option value="">Any</option><option value="buy" ${f.signal === "buy" ? "selected" : ""}>BUY</option><option value="dip" ${f.signal === "dip" ? "selected" : ""}>Buy on dip</option></select></div>
+      <div><label class="muted" style="font-size:12px">Min Trading score</label>${inp("scTScore", "e.g. 60", f.minTScore)}</div>
+      <div><label class="muted" style="font-size:12px">Min Investing score</label>${inp("scIScore", "e.g. 60", f.minIScore)}</div>
+      <div><label class="muted" style="font-size:12px">Max P/E</label>${inp("scPe", "e.g. 25", f.maxPe)}</div>
+      <div><label class="muted" style="font-size:12px">Min ROE %</label>${inp("scRoe", "e.g. 15", f.minRoe)}</div>
+      <div><label class="muted" style="font-size:12px">Min rev growth %</label>${inp("scGrowth", "e.g. 10", f.minGrowth)}</div>
+      <div><label class="muted" style="font-size:12px">Min volume surge ×</label>${inp("scVol", "e.g. 1.5", f.minVol)}</div>
+      <div><label class="muted" style="font-size:12px">RSI min</label>${inp("scRsiMin", "0", f.minRsi)}</div>
+      <div><label class="muted" style="font-size:12px">RSI max</label>${inp("scRsiMax", "100", f.maxRsi)}</div>
+      <div><label class="muted" style="font-size:12px">Min price ₹</label>${inp("scPmin", "0", f.minPrice)}</div>
+      <div><label class="muted" style="font-size:12px">Max price ₹</label>${inp("scPmax", "∞", f.maxPrice)}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button onclick="runScreener()" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer">Run screen</button>
+    <button onclick="clearScreener()" style="background:var(--chip);color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:10px 16px;font:inherit;cursor:pointer">Clear</button></div></div>
+    <div id="scResults"></div>`;
+}
+function _scFilters() {
+  const n = id => { const v = parseFloat(($("#" + id) || {}).value); return isNaN(v) ? null : v; };
+  return { sector: ($("#scSector") || {}).value || "", signal: ($("#scSignal") || {}).value || "",
+    minTScore: n("scTScore"), minIScore: n("scIScore"), maxPe: n("scPe"), minRoe: n("scRoe"), minGrowth: n("scGrowth"),
+    minVol: n("scVol"), minRsi: n("scRsiMin"), maxRsi: n("scRsiMax"), minPrice: n("scPmin"), maxPrice: n("scPmax") };
+}
+function runScreener(presetFilters) {
+  const f = presetFilters || _scFilters();
+  LS.set("screener", f);
+  let rows = IDX.rows.filter(r => {
+    if (f.sector && r.sector !== f.sector) return false;
+    if (f.signal && r.trading_verdict !== f.signal && r.investing_verdict !== f.signal) return false;
+    if (f.minTScore != null && (r.trading_score ?? 0) < f.minTScore) return false;
+    if (f.minIScore != null && (r.investing_score ?? 0) < f.minIScore) return false;
+    if (f.maxPe != null && (r.pe == null || r.pe > f.maxPe)) return false;
+    if (f.minRoe != null && (r.roe == null || r.roe * 100 < f.minRoe)) return false;
+    if (f.minGrowth != null && (r.rev_growth == null || r.rev_growth * 100 < f.minGrowth)) return false;
+    if (f.minVol != null && (r.vol_surge ?? 0) < f.minVol) return false;
+    if (f.minRsi != null && (r.rsi ?? 0) < f.minRsi) return false;
+    if (f.maxRsi != null && (r.rsi ?? 100) > f.maxRsi) return false;
+    if (f.minPrice != null && (r.close ?? 0) < f.minPrice) return false;
+    if (f.maxPrice != null && (r.close ?? 1e12) > f.maxPrice) return false;
+    return true;
+  }).sort((a, b) => (b.trading_score + b.investing_score) - (a.trading_score + a.investing_score));
+  const box = $("#scResults");
+  box.innerHTML = `<div class="muted" style="font-size:13px;margin:10px 0 6px">${rows.length} match${rows.length === 1 ? "" : "es"}</div>
+    <div class="scroll"><table><thead><tr><th>Stock</th><th class="n">₹</th><th class="n">T</th><th class="n">I</th><th class="n">P/E</th><th class="n">ROE</th><th class="n">RSI</th><th>Sector</th></tr></thead><tbody>
+    ${rows.slice(0, 100).map(r => `<tr class="row" onclick="openStock('${r.symbol}')"><td><b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span></td>
+    <td class="n">${num(r.close)}</td><td class="n">${num(r.trading_score, 0)}</td><td class="n">${num(r.investing_score, 0)}</td>
+    <td class="n">${r.pe != null ? num(r.pe, 1) : "–"}</td><td class="n">${r.roe != null ? Math.round(r.roe * 100) + "%" : "–"}</td><td class="n">${num(r.rsi, 0)}</td><td>${esc(r.sector || "–")}</td></tr>`).join("")}
+    </tbody></table></div>${rows.length > 100 ? '<div class="muted" style="font-size:12px;margin-top:6px">Showing top 100.</div>' : ""}`;
+  if (!rows.length) box.innerHTML = `<div class="card muted" style="margin-top:10px">No stocks match. Loosen a filter.</div>`;
+}
+function applyPreset(name) { const f = SCREENER_PRESETS[name]; LS.set("screener", f); load2(); setTimeout(() => runScreener(f), 50); }
+function clearScreener() { LS.set("screener", {}); load2(); }
+function wireScreener() { const f = LS.get("screener"); if (f && Object.keys(f).length) runScreener(f); }
 
 function backtest() {
   if (!BT) return `<h2>Backtest</h2><div class="card muted">The backtest runs weekly and appears once enough history has been collected.</div>`;
