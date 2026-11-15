@@ -500,8 +500,8 @@ load();
 const AI_PROVIDERS = {
   openrouter: { label: "OpenRouter (free, open-source)", url: "https://openrouter.ai/api/v1/chat/completions", kind: "openai",
     model: "meta-llama/llama-3.3-70b-instruct:free", keyUrl: "openrouter.ai/keys", keyHint: "or_... (free, no card)" },
-  groq: { label: "Groq (free, fast, Llama)", url: "https://api.groq.com/openai/v1/chat/completions", kind: "openai",
-    model: "llama-3.3-70b-versatile", keyUrl: "console.groq.com/keys", keyHint: "gsk_... (free, no card)" },
+  groq: { label: "Groq (free, fastest, Llama)", url: "https://api.groq.com/openai/v1/chat/completions", kind: "openai",
+    model: "llama-3.1-8b-instant", keyUrl: "console.groq.com/keys", keyHint: "gsk_... (free, no card)" },
   gemini: { label: "Google Gemini (free)", url: "https://generativelanguage.googleapis.com/v1beta/models", kind: "gemini",
     model: "gemini-flash-latest", keyUrl: "aistudio.google.com/apikey", keyHint: "AIza... (free, no card)" },
   anthropic: { label: "Anthropic Claude (paid)", url: "https://api.anthropic.com/v1/messages", kind: "anthropic",
@@ -630,11 +630,32 @@ async function aiCall(messages, sys) {
     const j = await r.json(); if (!r.ok) throw new Error((j.error && j.error.message) || "error " + r.status);
     return j.candidates[0].content.parts.map(p => p.text).join("");
   }
-  // openai-compatible (OpenRouter, Groq)
-  const r = await fetch(cfg.url, { method: "POST", headers: { "content-type": "application/json", "authorization": "Bearer " + key, "HTTP-Referer": location.origin, "X-Title": "Market Tracker" },
-    body: JSON.stringify({ model, max_tokens: 900, messages: [{ role: "system", content: sys }, ...messages] }) });
-  const j = await r.json(); if (!r.ok) throw new Error((j.error && (j.error.message || j.error)) || "error " + r.status);
-  return j.choices[0].message.content;
+  // openai-compatible (OpenRouter, Groq) — with automatic model recovery if the model was retired
+  const callOnce = async m => {
+    const r = await fetch(cfg.url, { method: "POST", headers: { "content-type": "application/json", "authorization": "Bearer " + key, "HTTP-Referer": location.origin, "X-Title": "Market Tracker" },
+      body: JSON.stringify({ model: m, max_tokens: 900, messages: [{ role: "system", content: sys }, ...messages] }) });
+    const j = await r.json();
+    return { ok: r.ok, status: r.status, msg: (j.error && (j.error.message || j.error)) || "", text: r.ok && j.choices ? j.choices[0].message.content : null };
+  };
+  let res = await callOnce(model);
+  if (!res.ok && /model|decommission|not found|does not exist|not a valid/i.test(res.msg)) {
+    const good = await aiPickWorkingModel(cfg, key);  // ask the provider what models it has now
+    if (good) { LS.set("ai_model_" + AI.provider(), good); res = await callOnce(good); if (res.ok) res.recovered = good; }
+  }
+  if (!res.ok) throw new Error(res.msg || "error " + res.status);
+  return res.text + (res.recovered ? "" : "");
+}
+// query the provider's live model list and pick a sensible text chat model (handles Groq/OpenRouter churn)
+async function aiPickWorkingModel(cfg, key) {
+  try {
+    const base = cfg.url.replace(/\/chat\/completions$/, "");
+    const r = await fetch(base + "/models", { headers: { "authorization": "Bearer " + key } });
+    const j = await r.json();
+    const ids = (j.data || []).map(m => m.id).filter(id => !/whisper|tts|guard|embed|vision|audio|moderation/i.test(id));
+    const pref = ids.find(id => /llama.*(70b|versatile)/i.test(id)) || ids.find(id => /instant|8b|3\.1|3\.3/i.test(id))
+      || ids.find(id => /llama/i.test(id)) || ids[0];
+    return pref || null;
+  } catch { return null; }
 }
 async function aiSend(text) {
   text = (text || "").trim(); if (!text || !AI.key()) return;
