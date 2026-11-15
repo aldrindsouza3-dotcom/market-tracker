@@ -6,11 +6,17 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], UNI = null, tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, tab = "today";
 const sortState = {};
+const LS = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const watch = () => LS.get("watchlist") || [];
+const inWatch = s => watch().includes(s);
+const toggleWatch = s => { const w = watch(); const i = w.indexOf(s); i >= 0 ? w.splice(i, 1) : w.push(s); LS.set("watchlist", w); };
 
-const TABS = [["today", "Today"], ["overview", "Overview"], ["search", "All stocks"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
+const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investing"], ["overview", "Overview"], ["search", "All stocks"], ["watchlist", "Watchlist"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
 ["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["news", "News"], ["how", "How it works"]];
+const BOTTOM = [["today", "Today", "★"], ["trading", "Trading", "⚡"], ["investing", "Investing", "◈"], ["markets", "Markets", "🌐"], ["more", "More", "☰"]];
+const SECTIONS = { markets: "metals", more: "search" };  // bottom-nav groups map to a starting tab
 
 async function load() {
   try {
@@ -19,6 +25,8 @@ async function load() {
     try { TR = await (await fetch("data/track_record.json?" + t)).json(); } catch { TR = { picks: [], summary: {} }; }
     try { HIST = await (await fetch("data/history.json?" + t)).json(); } catch { HIST = []; }
     try { UNI = await (await fetch("data/universe.json?" + t)).json(); } catch { UNI = null; }
+    try { MODES = await (await fetch("data/modes.json?" + t)).json(); } catch { MODES = null; }
+    try { IDX = await (await fetch("data/stocks_index.json?" + t)).json(); } catch { IDX = null; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
   }
@@ -26,14 +34,21 @@ async function load() {
   $("#stamp").textContent = "Updated " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day data";
   $("#foot").innerHTML = esc(D.disclaimer) + " Data: Yahoo Finance, AMFI via mfapi.in. May be delayed or incomplete.";
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("");
-  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.t; history.replaceState(null, "", "#" + tab); load2(); } };
+  $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) go(b.dataset.t); };
+  $("#bottomnav").innerHTML = BOTTOM.map(([k, l, ic]) => `<button data-t="${k}"><span class="ic">${ic}</span>${l}</button>`).join("");
+  $("#bottomnav").onclick = e => { const b = e.target.closest("button"); if (b) go(SECTIONS[b.dataset.t] || b.dataset.t); };
   load2();
 }
+function go(t) { tab = t; history.replaceState(null, "", "#" + tab); window.scrollTo(0, 0); load2(); }
 function load2() {
+  const VIEWS = { today, trading, investing, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, news, how };
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
-  $("#view").innerHTML = ({ today, overview, search, stocks, funds, metals, fx, global, ipo, track, news, how }[tab])();
+  const botActive = Object.keys(SECTIONS).find(k => SECTIONS[k] === tab) || tab;
+  document.querySelectorAll("#bottomnav button").forEach(b => b.classList.toggle("on", b.dataset.t === botActive));
+  $("#view").innerHTML = (VIEWS[tab] || today)();
   wireTables();
   if (tab === "search") wireSearch();
+  if (tab === "trading" || tab === "investing") wireModeTable();
 }
 
 function pickCard(p, i) {
@@ -105,6 +120,209 @@ function overview() {
         <div class="muted" style="font-size:12px">${HIST.length ? "latest " + num(HIST[HIST.length - 1][key], key === "breadth" ? 2 : 0) : ""}</div></div>`).join("")}
   </div>
   <p class="muted">All figures from the latest end-of-day run. "Market breadth" = share of tracked Indian stocks above their 200-day average (a breadth above ~0.6 is healthy, below ~0.4 is weak).</p>`;
+}
+
+// ---------- Trading / Investing modes ----------
+function modeCard(r, mode) {
+  const vtxt = mode === "trading" ? r.trading_verdict_txt : r.investing_verdict_txt;
+  const vc = mode === "trading" ? r.trading_verdict : r.investing_verdict;
+  const score = mode === "trading" ? r.trading_score : r.investing_score;
+  const lvl = mode === "trading" && r.trading_buy_upto
+    ? `<div class="lvl" style="margin-top:6px"><span>Good to buy up to</span><span>₹${num(r.trading_buy_upto)}</span><span>Stop-loss</span><span class="down">₹${num(r.trading_stop)}</span><span>Target 1</span><span class="up">₹${num(r.trading_t1)}</span></div>` : "";
+  return `<div class="mode-card ${mode === "trading" ? "trade" : "invest"}" onclick="openStock('${r.symbol}')" style="cursor:pointer">
+    <div class="top" style="display:flex;justify-content:space-between;gap:8px"><div><span class="mode-tag ${mode === "trading" ? "trade" : "invest"}">${mode}</span><h3 style="margin:2px 0">${esc(r.name)}</h3><span class="muted">${esc(r.symbol)} · ₹${num(r.close)} ${pct(r.day_change)}</span></div>
+    <div style="text-align:right"><div class="vd ${vc}">${esc(vtxt)}</div><div class="muted" style="margin-top:4px">score ${score}</div></div></div>${lvl}</div>`;
+}
+function modeView(mode) {
+  if (!MODES || !IDX) return `<div class="card">Dual-mode scoring appears after the next data update (it seeds over a few runs).</div>`;
+  const top = mode === "trading" ? MODES.trading_top5 : MODES.investing_top5;
+  const blurb = mode === "trading"
+    ? "Swing trades (days to weeks): trend, momentum, volume & delivery. Each pick shows a buy-up-to price, stop-loss, targets and a time-stop."
+    : "Long-term (months to years): quality & valuation first, trend only as timing. No tight stop — a thesis-broken condition and a review date instead.";
+  return `<h2>${mode === "trading" ? "⚡ Trading" : "◈ Investing"} — Top 5 <span class="muted" style="font-size:13px">(as of ${MODES.asof})</span></h2>
+    <p class="muted">${blurb}</p>
+    ${top.map(r => modeCard(r, mode)).join("")}
+    <h2>All eligible stocks, ranked</h2>
+    <p class="muted">${IDX.count} scored. Tap any stock for its chart, reading and levels. Sort by a column header.</p>
+    <input id="mq" placeholder="Filter by name or symbol…" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;margin-bottom:8px">
+    <div id="mtbl"></div>`;
+}
+function trading() { return modeView("trading"); }
+function investing() { return modeView("investing"); }
+function wireModeTable() {
+  const mode = tab;
+  const scoreKey = mode === "trading" ? "trading_score" : "investing_score";
+  const vKey = mode === "trading" ? "trading_verdict" : "investing_verdict";
+  const q = $("#mq"), box = $("#mtbl");
+  let sortKey = scoreKey, sortDir = -1;
+  const render = () => {
+    const term = (q.value || "").trim().toLowerCase();
+    let rows = IDX.rows.filter(r => !term || r.symbol.toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term));
+    rows = [...rows].sort((a, b) => ((a[sortKey] ?? -1) - (b[sortKey] ?? -1)) * sortDir);
+    const vlabel = { buy: "BUY", dip: "DIP", wait: "WAIT" };
+    box.innerHTML = `<div class="scroll"><table><thead><tr>
+      <th data-k="name">Stock</th><th class="n" data-k="close">₹</th><th class="n" data-k="day_change">Day</th>
+      <th class="n" data-k="${scoreKey}">Score</th><th data-k="${vKey}">Call</th><th class="n" data-k="med_turnover_cr">20d ₹cr</th></tr></thead><tbody>
+      ${rows.slice(0, 150).map(r => `<tr class="row" onclick="openStock('${r.symbol}')"><td><b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span></td>
+      <td class="n">${num(r.close)}</td><td class="n">${pct(r.day_change)}</td><td class="n">${bar(r[scoreKey])}</td>
+      <td><span class="vd ${r[vKey]}">${vlabel[r[vKey]] || "–"}</span></td><td class="n">${num(r.med_turnover_cr, 0)}</td></tr>`).join("")}
+      </tbody></table></div><div class="muted" style="font-size:12px;margin-top:6px">${rows.length} stocks${rows.length > 150 ? " — showing top 150" : ""}</div>`;
+    box.querySelector("thead").onclick = e => { const th = e.target.closest("th"); if (!th) return; const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; render(); };
+  };
+  q.oninput = render; render();
+}
+
+// ---------- Watchlist ----------
+function watchlist() {
+  const w = watch();
+  if (!w.length) return `<h2>Watchlist</h2><div class="card muted">No stocks yet. Open any stock and tap the ☆ to add it. Saved on this device only.</div>`;
+  const rows = (IDX ? IDX.rows : []).filter(r => w.includes(r.symbol));
+  const missing = w.filter(s => !rows.find(r => r.symbol === s));
+  return `<h2>Watchlist <span class="muted" style="font-size:13px">(${w.length}, on this device)</span></h2>
+    ${rows.map(r => modeCard(r, "trading")).join("")}
+    ${missing.length ? `<p class="muted">Not in the scored set yet: ${missing.map(s => `<a href="#" onclick="openStock('${s}');return false">${esc(s)}</a>`).join(", ")}</p>` : ""}`;
+}
+
+// ---------- chart (TradingView Lightweight Charts, bundled locally, Apache-2.0) ----------
+function sma(arr, n) { const o = arr.map(() => null); let s = 0; for (let i = 0; i < arr.length; i++) { s += arr[i]; if (i >= n) s -= arr[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+function buildChart(d) {
+  const O = d.ohlc; if (!O || !O.c || !O.c.length) { $("#chart").innerHTML = "<p class='muted'>No chart data.</p>"; return; }
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const LC = window.LightweightCharts;
+  const host = $("#chart"); host.innerHTML = ""; $("#vol").innerHTML = "";
+  if (chart) { try { chart.remove(); } catch {} }
+  const opts = { layout: { background: { color: "transparent" }, textColor: dark ? "#98a2b3" : "#667085" },
+    grid: { vertLines: { color: dark ? "#1f2630" : "#eef2f6" }, horzLines: { color: dark ? "#1f2630" : "#eef2f6" } },
+    rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false }, crosshair: { mode: 0 },
+    autoSize: true };
+  chart = LC.createChart(host, opts);
+  const vchart = LC.createChart($("#vol"), { ...opts, rightPriceScale: { borderVisible: false }, timeScale: { visible: false } });
+  const times = O.t;
+  const full = times.map((t, i) => ({ time: t, open: O.o[i], high: O.h[i], low: O.l[i], close: O.c[i], volume: O.v[i] }))
+    .filter(x => x.close != null);
+  let ranges = { "1M": 22, "3M": 66, "6M": 132, "1Y": 252, "3Y": 756, "Max": full.length };
+  let state = { range: "6M", type: "candle", inds: new Set(["sma50", "sma200", "levels"]) };
+  const extras = [];
+  function draw() {
+    // clear extra series
+    while (extras.length) { try { chart.removeSeries(extras.pop()); } catch {} }
+    host.querySelectorAll(".pl").forEach(n => n.remove());
+    const n = ranges[state.range] || full.length;
+    const data = full.slice(-n);
+    chart._main && (() => { try { chart.removeSeries(chart._main); } catch {} })();
+    if (state.type === "candle") {
+      chart._main = chart.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
+      chart._main.setData(data.map(x => ({ time: x.time, open: x.open, high: x.high, low: x.low, close: x.close })));
+    } else {
+      chart._main = chart.addLineSeries({ color: css("--accent"), lineWidth: 2 });
+      chart._main.setData(data.map(x => ({ time: x.time, value: x.close })));
+    }
+    const closes = data.map(x => x.close);
+    const addSMA = (len, col) => { const v = sma(closes, len); const s = chart.addLineSeries({ color: col, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }); s.setData(data.map((x, i) => v[i] == null ? null : { time: x.time, value: v[i] }).filter(Boolean)); extras.push(s); };
+    if (state.inds.has("sma20")) addSMA(20, "#f59e0b");
+    if (state.inds.has("sma50")) addSMA(50, "#3b82f6");
+    if (state.inds.has("sma200")) addSMA(200, "#a855f7");
+    if (state.inds.has("bb")) { const m = sma(closes, 20); const dev = closes.map((c, i) => { if (i < 19) return null; const sl = closes.slice(i - 19, i + 1), mu = m[i]; return Math.sqrt(sl.reduce((a, b) => a + (b - mu) ** 2, 0) / 20); }); [1, -1].forEach(sgn => { const s = chart.addLineSeries({ color: "#14b8a6", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }); s.setData(data.map((x, i) => dev[i] == null ? null : { time: x.time, value: m[i] + sgn * 2 * dev[i] }).filter(Boolean)); extras.push(s); }); }
+    if (state.inds.has("levels") && d.trading) {
+      const T = d.trading;
+      [["buy_upto", "#22c55e", "Buy ≤"], ["stop_loss", "#ef4444", "Stop"], ["target_1", "#3b82f6", "T1"], ["target_2", "#6366f1", "T2"]].forEach(([k, col, lbl]) => {
+        if (T[k]) chart._main.createPriceLine({ price: T[k], color: col, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: lbl });
+      });
+    }
+    // volume
+    vchart._v && (() => { try { vchart.removeSeries(vchart._v); } catch {} })();
+    vchart._v = vchart.addHistogramSeries({ priceLineVisible: false });
+    vchart._v.setData(data.map(x => ({ time: x.time, value: x.volume || 0, color: x.close >= x.open ? css("--up") : css("--down") })));
+    chart.timeScale().fitContent(); vchart.timeScale().fitContent();
+  }
+  draw();
+  chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) vchart.timeScale().setVisibleLogicalRange(r); });
+  $("#ranges").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.r) { state.range = b.dataset.r; $("#ranges").querySelectorAll("[data-r]").forEach(x => x.classList.toggle("on", x === b)); } if (b.dataset.type) { state.type = b.dataset.type; $("#ranges").querySelectorAll(".ctype").forEach(x => x.classList.toggle("on", x === b)); } draw(); };
+  $("#inds").onclick = e => { const b = e.target.closest("button"); if (!b) return; const k = b.dataset.i; state.inds.has(k) ? state.inds.delete(k) : state.inds.add(k); b.classList.toggle("on"); draw(); };
+}
+
+// ---------- Stock detail page with interactive chart ----------
+let chart = null, _chartRO = null;
+async function openStock(sym) {
+  const el = $("#detail");
+  el.hidden = false; document.body.style.overflow = "hidden";
+  el.innerHTML = `<div class="shead"><button onclick="closeStock()">←</button><b>${esc(sym)}</b><span class="muted" id="dsub"></span></div><div class="sbody"><p class="muted">Loading ${esc(sym)}…</p></div>`;
+  let d;
+  try { d = await (await fetch(`data/stocks/${sym}.json?` + Date.now())).json(); }
+  catch { $(".sbody", el).innerHTML = `<div class="card warn">No detail for ${esc(sym)} yet — it may not be in the scored set. <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Open in Screener</a></div>`; return; }
+  renderStock(el, d);
+}
+function closeStock() { const el = $("#detail"); el.hidden = true; document.body.style.overflow = ""; if (chart) { try { chart.remove(); } catch {} chart = null; } }
+window.addEventListener("popstate", () => { if (!$("#detail").hidden) closeStock(); });
+
+function renderStock(el, d) {
+  const T = d.trading, I = d.investing, R = d.reading, star = inWatch(d.symbol) ? "on" : "";
+  $("#dsub", el).textContent = `₹${num(d.price)} · ${d.day_change >= 0 ? "+" : ""}${(d.day_change * 100).toFixed(2)}% · as of ${d.asof}`;
+  const fund = d.fundamentals ? `<div class="card"><b>Fundamentals</b><div class="lvl" style="grid-template-columns:auto 1fr auto 1fr">
+    <span>P/E</span><span>${num(d.fundamentals.pe, 1)}</span><span>ROE</span><span>${d.fundamentals.roe != null ? (d.fundamentals.roe * 100).toFixed(0) + "%" : "–"}</span>
+    <span>Debt/Eq</span><span>${num(d.fundamentals.debt_equity, 0)}</span><span>Rev growth</span><span>${d.fundamentals.rev_growth != null ? (d.fundamentals.rev_growth * 100).toFixed(0) + "%" : "–"}</span>
+    <span>Margin</span><span>${d.fundamentals.profit_margin != null ? (d.fundamentals.profit_margin * 100).toFixed(0) + "%" : "–"}</span><span>Div yld</span><span>${d.fundamentals.div_yield != null ? num(d.fundamentals.div_yield, 2) + "%" : "–"}</span></div></div>` : "";
+  $(".sbody", el).innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div><h2 style="margin:0">${esc(d.name)}</h2><span class="muted">${esc(d.symbol)} · ${d.days_history} days history · ${esc(d.source)}</span></div>
+      <button class="star ${star}" id="star" title="Watchlist">${star ? "★" : "☆"}</button></div>
+
+    <div class="grid" style="margin-top:10px">
+      <div class="mode-card trade"><span class="mode-tag trade">Trading</span> <span class="muted">score ${T.score}</span>
+        <div class="vd ${T.verdict_class}" style="margin:6px 0">${esc(T.verdict)}</div>
+        <div class="lvl"><span>Good to buy up to</span><span>${T.buy_upto ? "₹" + num(T.buy_upto) : "—"}</span><span>Entry zone</span><span>₹${num(T.entry_low)}–${num(T.entry_high)}</span>
+        <span>Stop-loss</span><span class="down">₹${num(T.stop_loss)}</span><span>Targets</span><span class="up">₹${num(T.target_1)} / ${num(T.target_2)}</span>
+        <span>Risk:reward</span><span>${T.risk_reward || "–"} · time-stop ${T.time_stop_days}d</span></div>
+        <div class="muted" style="font-size:12px;margin-top:6px">${esc(T.gap_rule)} ${esc(T.applies)}</div></div>
+      <div class="mode-card invest"><span class="mode-tag invest">Investing</span> <span class="muted">score ${I.score}</span>
+        <div class="vd ${I.verdict_class}" style="margin:6px 0">${esc(I.verdict)}</div>
+        <div class="muted" style="font-size:13px">${esc(I.entry_style)}<br>${esc(I.thesis_broken_if)}<br>${esc(I.review)}</div></div>
+    </div>
+
+    <div class="chartbox">
+      <div class="ranges" id="ranges">${["1M", "3M", "6M", "1Y", "3Y", "Max"].map(r => `<button data-r="${r}" class="${r === "6M" ? "on" : ""}">${r}</button>`).join("")}
+        <span style="flex:1"></span><button data-type="candle" class="ctype on">Candles</button><button data-type="line" class="ctype">Line</button></div>
+      <div class="inds" id="inds">${[["sma20", "SMA20"], ["sma50", "SMA50"], ["sma200", "SMA200"], ["bb", "Bollinger"], ["levels", "Entry/Stop/Target"]].map(([k, l]) => `<button data-i="${k}" class="${["sma50", "sma200", "levels"].includes(k) ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="chartwrap" id="chart"></div><div class="volwrap" id="vol"></div>
+      <div class="muted" style="font-size:12px">End-of-day candles. Weekly/monthly views aggregate daily data. No intraday.</div>
+    </div>
+
+    <div class="card"><b>Chart reading</b> <span class="muted">(rule-based, as of ${d.asof})</span>
+      <div class="reading-row"><span>Short</span><span>${esc(R.short)}</span></div>
+      <div class="reading-row"><span>Medium</span><span>${esc(R.medium)}</span></div>
+      <div class="reading-row"><span>Long</span><span>${esc(R.long)}</span></div>
+      <div class="reading-row"><span>Momentum</span><span>${esc(R.momentum)}</span></div>
+      <div class="reading-row"><span>Volume</span><span>${esc(R.volume)}</span></div>
+      <div class="reading-row"><span>Volatility</span><span>${esc(R.volatility)}</span></div>
+      <div class="reading-row"><span>Levels</span><span>Support ₹${num(R.support)} · Resistance ₹${num(R.resistance)}</span></div>
+      ${R.events.length ? `<div style="margin:8px 0">${R.events.map(e => `<span class="evt">${esc(e)}</span>`).join("")}</div>` : ""}
+      <p style="margin:8px 0 0"><b>${esc(R.summary)}</b><br><span class="muted">Watch next: ${esc(R.watch_next)}</span></p></div>
+
+    <div class="card sizer"><b>Position size</b> <span class="muted">(saved on this device)</span>
+      <div style="display:flex;gap:8px;margin-top:8px"><input id="cap" type="number" placeholder="Capital ₹" value="${LS.get("cap") || ""}"><input id="riskpct" type="number" placeholder="Risk % per trade" value="${LS.get("riskpct") || 1}"></div>
+      <div class="out" id="sizeout"></div>
+      <div class="muted" style="font-size:12px">Quantity so that (entry − stop) × qty ≈ your rupee risk. Buy at market up to the "good to buy" price.</div></div>
+
+    ${fund}
+    <div class="card"><b>Open in</b> · <a href="${esc(d.links.tickertape || "#")}" target="_blank" rel="noopener">Tickertape</a> · <a href="${esc(d.links.screener || "#")}" target="_blank" rel="noopener">Screener</a> · <a href="${esc(d.links.moneycontrol || "#")}" target="_blank" rel="noopener">Moneycontrol</a></div>
+    <p class="muted" style="font-size:12px">${esc(d.disclaimer)}</p>`;
+
+  // star
+  $("#star", el).onclick = () => { toggleWatch(d.symbol); const on = inWatch(d.symbol); $("#star", el).classList.toggle("on", on); $("#star", el).textContent = on ? "★" : "☆"; };
+  // position sizer
+  const sizer = () => {
+    const cap = parseFloat($("#cap", el).value) || 0, rp = parseFloat($("#riskpct", el).value) || 0;
+    LS.set("cap", cap); LS.set("riskpct", rp);
+    const perShare = T.entry_high - T.stop_loss;
+    if (cap > 0 && rp > 0 && perShare > 0) {
+      const risk = cap * rp / 100, qty = Math.floor(risk / perShare), cost = qty * T.entry_high;
+      $("#sizeout", el).innerHTML = `Buy <b>${qty}</b> shares ≈ ₹${num(cost, 0)} · risking ₹${num(qty * perShare, 0)} if stopped`;
+    } else $("#sizeout", el).textContent = "Enter capital and risk % above.";
+  };
+  $("#cap", el).oninput = sizer; $("#riskpct", el).oninput = sizer; sizer();
+  // chart
+  buildChart(d);
 }
 
 function search() {

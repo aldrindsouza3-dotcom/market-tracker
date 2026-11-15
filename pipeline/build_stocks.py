@@ -121,6 +121,9 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
                    "close": round(t["price"], 2), "day_change": t["day_change"],
                    "trading_score": tscore, "investing_score": iscore,
                    "trading_verdict": tplan["verdict_class"], "investing_verdict": iplan["verdict_class"],
+                   "trading_verdict_txt": tplan["verdict"], "trading_buy_upto": tplan["buy_upto"],
+                   "trading_stop": tplan["stop_loss"], "trading_t1": tplan["target_1"],
+                   "investing_verdict_txt": iplan["verdict"],
                    "rsi": round(t["rsi"], 0), "ret_1y": t["ret_1y"], "days": t["days"],
                    "med_turnover_cr": u.get("med_turnover_cr"), "has_fundamentals": had_f}
             index_rows.append(row)
