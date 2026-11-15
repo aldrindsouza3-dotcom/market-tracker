@@ -124,7 +124,9 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
                    "trading_verdict_txt": tplan["verdict"], "trading_buy_upto": tplan["buy_upto"],
                    "trading_stop": tplan["stop_loss"], "trading_t1": tplan["target_1"],
                    "investing_verdict_txt": iplan["verdict"],
-                   "rsi": round(t["rsi"], 0), "ret_1y": t["ret_1y"], "days": t["days"],
+                   "rsi": round(t["rsi"], 0), "ret_1y": t["ret_1y"], "ret_3m": t["ret_3m"], "days": t["days"],
+                   "vol_surge": round(t.get("vol_surge", 1), 2), "risk_reward": tplan.get("risk_reward"),
+                   "pe": (f or {}).get("pe"), "roe": (f or {}).get("roe"), "rev_growth": (f or {}).get("rev_growth"),
                    "med_turnover_cr": u.get("med_turnover_cr"), "has_fundamentals": had_f}
             index_rows.append(row)
             # per-symbol detail file

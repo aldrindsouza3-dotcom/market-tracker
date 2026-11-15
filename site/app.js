@@ -159,17 +159,28 @@ function wireModeTable() {
   const vKey = mode === "trading" ? "trading_verdict" : "investing_verdict";
   const q = $("#mq"), box = $("#mtbl");
   let sortKey = scoreKey, sortDir = -1;
+  const vlabel = { buy: "BUY", dip: "DIP", wait: "WAIT" };
+  // distinct columns per mode: Trading = setup/levels/momentum; Investing = valuation/quality/horizon
+  const cols = mode === "trading" ? [
+    { h: "Stock", k: "name", f: r => `<b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span>` },
+    { h: "₹", k: "close", n: 1, f: r => num(r.close) }, { h: "Day", k: "day_change", n: 1, f: r => pct(r.day_change) },
+    { h: "T-score", k: "trading_score", n: 1, f: r => bar(r.trading_score) }, { h: "Call", k: "trading_verdict", f: r => `<span class="vd ${r.trading_verdict}">${vlabel[r.trading_verdict] || "–"}</span>` },
+    { h: "Buy ≤", k: "trading_buy_upto", n: 1, f: r => r.trading_buy_upto ? "₹" + num(r.trading_buy_upto) : "–" },
+    { h: "R:R", k: "risk_reward", n: 1, f: r => r.risk_reward ?? "–" }, { h: "RSI", k: "rsi", n: 1, f: r => num(r.rsi, 0) },
+    { h: "Vol×", k: "vol_surge", n: 1, f: r => r.vol_surge ? r.vol_surge + "×" : "–" },
+  ] : [
+    { h: "Stock", k: "name", f: r => `<b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span>` },
+    { h: "₹", k: "close", n: 1, f: r => num(r.close) }, { h: "1Y", k: "ret_1y", n: 1, f: r => pct(r.ret_1y, 0) },
+    { h: "I-score", k: "investing_score", n: 1, f: r => bar(r.investing_score) }, { h: "Call", k: "investing_verdict", f: r => `<span class="vd ${r.investing_verdict}">${vlabel[r.investing_verdict] || "–"}</span>` },
+    { h: "P/E", k: "pe", n: 1, f: r => r.pe != null ? num(r.pe, 1) : "–" }, { h: "ROE", k: "roe", n: 1, f: r => r.roe != null ? Math.round(r.roe * 100) + "%" : "–" },
+    { h: "Growth", k: "rev_growth", n: 1, f: r => r.rev_growth != null ? Math.round(r.rev_growth * 100) + "%" : "–" }, { h: "Sector", k: "sector", f: r => esc(r.sector || "–") },
+  ];
   const render = () => {
     const term = (q.value || "").trim().toLowerCase();
     let rows = IDX.rows.filter(r => !term || r.symbol.toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term));
     rows = [...rows].sort((a, b) => ((a[sortKey] ?? -1) - (b[sortKey] ?? -1)) * sortDir);
-    const vlabel = { buy: "BUY", dip: "DIP", wait: "WAIT" };
-    box.innerHTML = `<div class="scroll"><table><thead><tr>
-      <th data-k="name">Stock</th><th class="n" data-k="close">₹</th><th class="n" data-k="day_change">Day</th>
-      <th class="n" data-k="${scoreKey}">Score</th><th data-k="${vKey}">Call</th><th class="n" data-k="med_turnover_cr">20d ₹cr</th></tr></thead><tbody>
-      ${rows.slice(0, 150).map(r => `<tr class="row" onclick="openStock('${r.symbol}')"><td><b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span></td>
-      <td class="n">${num(r.close)}</td><td class="n">${pct(r.day_change)}</td><td class="n">${bar(r[scoreKey])}</td>
-      <td><span class="vd ${r[vKey]}">${vlabel[r[vKey]] || "–"}</span></td><td class="n">${num(r.med_turnover_cr, 0)}</td></tr>`).join("")}
+    box.innerHTML = `<div class="scroll"><table><thead><tr>${cols.map(c => `<th class="${c.n ? "n" : ""}" data-k="${c.k}">${c.h}</th>`).join("")}</tr></thead><tbody>
+      ${rows.slice(0, 150).map(r => `<tr class="row" onclick="openStock('${r.symbol}')">${cols.map(c => `<td class="${c.n ? "n" : ""}">${c.f(r)}</td>`).join("")}</tr>`).join("")}
       </tbody></table></div><div class="muted" style="font-size:12px;margin-top:6px">${rows.length} stocks${rows.length > 150 ? " — showing top 150" : ""}</div>`;
     box.querySelector("thead").onclick = e => { const th = e.target.closest("th"); if (!th) return; const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; render(); };
   };
