@@ -97,6 +97,7 @@ footer{padding:24px 16px 40px}
 @media(max-width:760px){body.ai-open #aifab{display:none}}
 .aipanel .ahead .x{font-size:22px;line-height:1;padding:4px 8px}
 .aiback{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+.aipanel[hidden]{display:none !important}
 .aipanel{position:fixed;z-index:61;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;
   right:16px;bottom:88px;width:min(420px,calc(100vw - 32px));height:min(560px,70vh);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 @media(max-width:760px){
