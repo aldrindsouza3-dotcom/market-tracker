@@ -287,7 +287,14 @@ async function openStock(sym) {
   el.innerHTML = `<div class="shead"><button onclick="closeStock()">←</button><b>${esc(sym)}</b><span class="muted" id="dsub"></span></div><div class="sbody"><p class="muted">Loading ${esc(sym)}…</p></div>`;
   let d;
   try { d = await (await fetch(`data/stocks/${sym}.json?` + Date.now())).json(); }
-  catch { $(".sbody", el).innerHTML = `<div class="card warn">No detail for ${esc(sym)} yet — it may not be in the scored set. <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Open in Screener</a></div>`; return; }
+  catch {
+    const uni = UNI && UNI.symbols.find(x => x.symbol === sym);
+    const why = uni && !uni.eligible ? `This stock doesn't pass the liquidity gate (${esc(uni.reason)}), so it's not analysed — but you can still research it below.`
+      : `Its chart analysis is still being built (history seeds in over the next day or two). Check back soon.`;
+    $(".sbody", el).innerHTML = `<div class="card warn"><b>${esc(sym)} — analysis not ready yet</b><br><span class="muted">${why}</span>
+      <div class="card" style="margin-top:10px"><b>Research it now</b> · <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Screener</a> · <a href="https://www.tickertape.in/stocks/${esc(sym.toLowerCase())}" target="_blank" rel="noopener">Tickertape</a> · <a href="https://www.moneycontrol.com/india/stockpricequote/${esc(sym)}" target="_blank" rel="noopener">Moneycontrol</a></div></div>`;
+    return;
+  }
   renderStock(el, d);
 }
 function closeStock() { const el = $("#detail"); el.hidden = true; document.body.style.overflow = ""; window._openSym = null; window._openDetail = null; if (chart) { try { chart.remove(); } catch {} chart = null; } }

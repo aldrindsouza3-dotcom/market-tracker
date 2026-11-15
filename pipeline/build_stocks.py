@@ -25,9 +25,9 @@ OUT = ROOT / "site" / "data"
 STOCKS = OUT / "stocks"
 FUND_CACHE = nse.CACHE / "fundamentals.json"
 
-SEED_PER_RUN = 180      # new symbols to seed history for, per run (spreads Yahoo load; Actions cache persists)
-FUND_PER_RUN = 70       # fundamentals refreshed per run (weekly cadence per symbol)
-TOP_N = 450             # most-liquid eligible symbols to score in full this phase
+SEED_PER_RUN = 300      # new symbols to seed history for, per run (spreads Yahoo load; Actions cache persists)
+FUND_PER_RUN = 90       # fundamentals refreshed per run (weekly cadence per symbol)
+TOP_N = 1400            # cover all liquidity-gate-eligible stocks (grows to full coverage as history seeds)
 
 
 def _clean(o):
