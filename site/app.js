@@ -491,7 +491,7 @@ const AI = {
   cfg: () => AI_PROVIDERS[AI.provider()] || AI_PROVIDERS.openrouter,
   key: () => LS.get("ai_key_" + (LS.get("ai_provider") || "openrouter")),
   model: () => LS.get("ai_model_" + (LS.get("ai_provider") || "openrouter")) || AI.cfg().model,
-  history: [],
+  history: [], view: "chat",
 };
 const TUTOR = `You are the built-in assistant inside a personal Indian stock-market dashboard called Market Tracker, used by one retail investor.
 Your jobs: (1) explain what the user is looking at and how to use the app's workflow; (2) teach stock-market concepts from basics to advanced (e.g. candlesticks, moving averages, RSI, MACD, valuation, P/E, ROE, position sizing, risk management, portfolio theory, market regimes, options basics) in plain language with small examples; (3) interpret the COMPUTED data you are given.
@@ -519,6 +519,7 @@ const QUICK = {
 function _aiEsc(ev) { if (ev.key === "Escape") aiClose(); }
 function aiClose() {
   $("#aipanel").hidden = true;
+  AI.view = "chat";
   document.body.classList.remove("ai-open");
   const b = document.getElementById("aiback"); if (b) b.remove();
   document.removeEventListener("keydown", _aiEsc);
@@ -533,15 +534,22 @@ function aiOpen() {
   document.addEventListener("keydown", _aiEsc);
   aiRender();
 }
+// header buttons: minimise (keeps your key + chat, just hides the panel) · settings · close
+function aiHeader(withSettings) {
+  return `<div class="ahead"><b>✨ Ask AI</b><span style="flex:1"></span>
+    ${withSettings ? `<button class="x" title="Settings" onclick="aiSettings()">⚙</button>` : ""}
+    <button class="x" title="Minimise" onclick="aiClose()">–</button>
+    <button class="x" title="Close" onclick="aiClose()">×</button></div>`;
+}
 function aiRender() {
   const p = $("#aipanel"); p.hidden = false;
-  const closeBtns = `<button class="x" title="Close" onclick="aiClose()">×</button>`;
+  if (AI.view === "settings") { aiSettingsView(p); return; }
   if (!AI.key()) {
     const prov = AI.provider(), cfg = AI.cfg();
-    p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b>${closeBtns}</div>
+    p.innerHTML = `${aiHeader(false)}
       <div class="aimsgs"><div class="amsg a">Hi! I explain any screen, teach stock-market concepts (basic to advanced), and interpret the app's numbers.
       <br><br>Pick a <b>free</b> AI provider and paste its key (no card needed). It's stored only on this device and never uploaded.</div>
-      <div class="amsg a">Recommended: <b>OpenRouter</b> or <b>Groq</b> — free, open-source Llama models. Get a free key at <b>${esc(cfg.keyUrl)}</b>.</div></div>
+      <div class="amsg a"><b>Groq</b> is the fastest free option; <b>OpenRouter</b> runs open-source Llama. Get a free key at <b>${esc(cfg.keyUrl)}</b>.</div></div>
       <div style="padding:0 14px 8px"><select id="aiprov" onchange="aiPickProvider(this.value)" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit">
         ${Object.entries(AI_PROVIDERS).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select></div>
       <div class="ainput"><input id="aikey" type="password" placeholder="${esc(cfg.keyHint)}"><button onclick="aiSaveKey()">Save</button></div>
@@ -549,21 +557,42 @@ function aiRender() {
     return;
   }
   const chips = (QUICK[tab] || QUICK._default);
-  p.innerHTML = `<div class="ahead"><b>✨ Ask AI</b><span style="flex:1"></span><button class="x" title="Settings" onclick="aiSettings()">⚙</button>${closeBtns}</div>
+  p.innerHTML = `${aiHeader(true)}
     <div class="aimsgs" id="aimsgs">${AI.history.length ? "" : `<div class="amsg a">Ask me about the <b>${esc(tab)}</b> screen, or any market concept.</div>`}
     ${AI.history.map(m => `<div class="amsg ${m.role === "user" ? "u" : "a"}">${esc(m.text)}</div>`).join("")}</div>
     <div class="chips">${chips.map(q => `<button onclick="aiSend(this.textContent)">${esc(q)}</button>`).join("")}</div>
     <div class="ainput"><input id="aiq" placeholder="Ask anything…" onkeydown="if(event.key==='Enter'){aiSend(this.value);this.value=''}"><button onclick="var i=document.getElementById('aiq');aiSend(i.value);i.value=''">Send</button></div>`;
   const m = $("#aimsgs"); m.scrollTop = m.scrollHeight;
 }
-function aiPickProvider(p) { LS.set("ai_provider", p); aiRender(); }
-function aiSaveKey() { const k = $("#aikey").value.trim(); if (k) { LS.set("ai_key_" + AI.provider(), k); aiRender(); } }
-function aiSettings() {
-  const m = prompt("Model for " + AI.cfg().label + " (blank = default " + AI.cfg().model + "):", AI.model());
-  if (m !== null) { if (m.trim()) LS.set("ai_model_" + AI.provider(), m.trim()); else localStorage.removeItem("ai_model_" + AI.provider()); }
-  if (confirm("Also clear your saved API key from this device?")) { localStorage.removeItem("ai_key_" + AI.provider()); AI.history = []; }
-  aiRender();
+function aiSettingsView(p) {
+  const prov = AI.provider(), cfg = AI.cfg();
+  p.innerHTML = `${aiHeader(false)}
+    <div class="aimsgs">
+      <div class="amsg a" style="max-width:100%"><b>AI settings</b></div>
+      <label class="muted" style="font-size:12px">Provider</label>
+      <select id="aiprov" onchange="aiPickProvider(this.value)" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit">
+        ${Object.entries(AI_PROVIDERS).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>
+      <label class="muted" style="font-size:12px;margin-top:8px">Model <span style="opacity:.7">(blank = ${esc(cfg.model)})</span></label>
+      <input id="aimodel" value="${esc(LS.get("ai_model_" + prov) || "")}" placeholder="${esc(cfg.model)}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit">
+      <label class="muted" style="font-size:12px;margin-top:8px">API key <span style="opacity:.7">(${AI.key() ? "saved on this device" : "not set"})</span></label>
+      <input id="aikey2" type="password" placeholder="${esc(cfg.keyHint)}" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font:inherit">
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button onclick="aiSaveSettings()" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer">Save</button>
+        <button onclick="aiClearKey()" style="background:var(--chip);color:var(--down);border:1px solid var(--line);border-radius:9px;padding:9px 16px;font:inherit;cursor:pointer">Clear key</button>
+        <button onclick="AI.view='chat';aiRender()" style="background:var(--chip);color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:9px 16px;font:inherit;cursor:pointer">Back</button>
+      </div>
+    </div>`;
 }
+function aiPickProvider(p) { LS.set("ai_provider", p); aiRender(); }
+function aiSaveKey() { const k = $("#aikey").value.trim(); if (k) { LS.set("ai_key_" + AI.provider(), k); AI.view = "chat"; aiRender(); } }
+function aiSettings() { AI.view = "settings"; aiRender(); }
+function aiSaveSettings() {
+  const m = ($("#aimodel").value || "").trim(), k = ($("#aikey2").value || "").trim();
+  if (m) LS.set("ai_model_" + AI.provider(), m); else localStorage.removeItem("ai_model_" + AI.provider());
+  if (k) LS.set("ai_key_" + AI.provider(), k);
+  AI.view = "chat"; aiRender();
+}
+function aiClearKey() { localStorage.removeItem("ai_key_" + AI.provider()); AI.history = []; AI.view = "chat"; aiRender(); }
 async function aiCall(messages, sys) {
   const cfg = AI.cfg(), key = AI.key(), model = AI.model();
   if (cfg.kind === "anthropic") {
