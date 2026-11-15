@@ -156,7 +156,7 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
                       "price": round(t["price"], 2), "day_change": t["day_change"], "days_history": t["days"],
                       "indicators": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in t.items()},
                       "trading": {"score": tscore, **tplan}, "investing": {"score": iscore, "has_fundamentals": had_f, **iplan},
-                      "reading": reading, "risk": risk, "fundamentals": f,
+                      "reading": reading, "risk": risk, "fundamentals": f, "fundamental_analysis": SC.fundamental_analysis(f),
                       "links": {"tickertape": u.get("tickertape"), "screener": u.get("screener"), "moneycontrol": u.get("moneycontrol")},
                       "ohlc": _compact_ohlc(h),
                       "disclaimer": "Research aid, not investment advice. End-of-day data."}

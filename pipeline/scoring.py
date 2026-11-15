@@ -162,6 +162,39 @@ def investing_plan(t: dict, f: dict | None, score: float) -> dict:
             "applies": "Long-term view; price levels are guides, not tight stops."}
 
 
+# ---------------- rule-based fundamental analysis (for investing) ----------------
+def fundamental_analysis(f: dict | None) -> dict | None:
+    """Plain-language verdict per fundamental dimension, each with its number. For the Investing view."""
+    if not f:
+        return None
+    out, pos, neg = {}, 0, 0
+    pe, roe, de, gr, pm, dy = f.get("pe"), f.get("roe"), f.get("debt_equity"), f.get("rev_growth"), f.get("profit_margin"), f.get("div_yield")
+    if pe is not None and pe > 0:
+        v = "cheap" if pe < 15 else "reasonable" if pe < 25 else "rich" if pe < 40 else "very expensive"
+        out["Valuation"] = f"P/E {pe:.1f} — {v}"
+        pos += v in ("cheap", "reasonable"); neg += v in ("rich", "very expensive")
+    if roe is not None:
+        v = "excellent" if roe > 0.2 else "good" if roe > 0.15 else "average" if roe > 0.1 else "weak"
+        out["Profitability"] = f"ROE {roe * 100:.0f}% — {v}"
+        pos += v in ("excellent", "good"); neg += v == "weak"
+    if pm is not None:
+        out["Margins"] = f"Net margin {pm * 100:.0f}% — " + ("healthy" if pm > 0.12 else "thin" if pm < 0.05 else "moderate")
+        pos += pm > 0.12; neg += pm < 0.05
+    if gr is not None:
+        v = "strong" if gr > 0.15 else "steady" if gr > 0.07 else "slow" if gr > 0 else "shrinking"
+        out["Growth"] = f"Revenue {gr * 100:+.0f}% — {v}"
+        pos += v in ("strong", "steady"); neg += v == "shrinking"
+    if de is not None:
+        v = "low debt" if de < 50 else "moderate debt" if de < 120 else "high debt"
+        out["Leverage"] = f"Debt/Equity {de:.0f} — {v}"
+        pos += de < 50; neg += de >= 120
+    if dy:
+        out["Dividend"] = f"Yield {dy:.1f}%"
+    verdict = "Strong fundamentals" if pos >= 3 and neg == 0 else "Weak fundamentals" if neg >= 2 else "Mixed fundamentals"
+    out["_verdict"] = verdict
+    return out
+
+
 # ---------------- foundational risk metrics (vs Nifty 50) ----------------
 def risk_metrics(closes, dates, nifty_ret: dict) -> dict:
     """Beta, alpha (annualised), R^2, annualised volatility vs the Nifty 50.

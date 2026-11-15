@@ -6,7 +6,7 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, BT = null, BRIEF = null, tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, USIDX = null, BT = null, BRIEF = null, tab = "today";
 const sortState = {};
 const LS = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const watch = () => LS.get("watchlist") || [];
@@ -14,7 +14,7 @@ const inWatch = s => watch().includes(s);
 const toggleWatch = s => { const w = watch(); const i = w.indexOf(s); i >= 0 ? w.splice(i, 1) : w.push(s); LS.set("watchlist", w); };
 
 const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investing"], ["screener", "Screener"], ["overview", "Overview"], ["search", "All stocks"], ["watchlist", "Watchlist"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
-["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["backtest", "Backtest"], ["news", "News"], ["how", "How it works"]];
+["us", "US & Global stocks"], ["fx", "Currency & bonds"], ["global", "Global indices"], ["ipo", "IPOs"], ["track", "Track record"], ["backtest", "Backtest"], ["news", "News"], ["how", "How it works"]];
 const BOTTOM = [["today", "Today", "★"], ["trading", "Trading", "⚡"], ["investing", "Investing", "◈"], ["markets", "Markets", "🌐"], ["more", "More", "☰"]];
 const SECTIONS = { markets: "metals", more: "search" };  // bottom-nav groups map to a starting tab
 
@@ -45,6 +45,7 @@ async function load() {
     try { IDX = await fetchJSON("data/stocks_index.json"); } catch { IDX = null; }
     try { BT = await fetchJSON("data/backtest.json"); } catch { BT = null; }
     try { BRIEF = await fetchJSON("data/brief.json"); } catch { BRIEF = null; }
+    try { USIDX = await fetchJSON("data/us_index.json"); } catch { USIDX = null; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn"><b>Couldn't load data.</b><br><span class="muted">${esc(e.message)}. Check your connection, or reset the app if it stays blank.</span>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -66,7 +67,7 @@ async function load() {
 }
 function go(t) { tab = t; history.replaceState(null, "", "#" + tab); window.scrollTo(0, 0); load2(); }
 function load2() {
-  const VIEWS = { today, trading, investing, screener, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, backtest, news, how };
+  const VIEWS = { today, trading, investing, screener, overview, search, watchlist, us, funds, metals, fx, global, ipo, track, backtest, news, how };
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
   const botActive = Object.keys(SECTIONS).find(k => SECTIONS[k] === tab) || tab;
   document.querySelectorAll("#bottomnav button").forEach(b => b.classList.toggle("on", b.dataset.t === botActive));
@@ -76,6 +77,7 @@ function load2() {
   if (tab === "trading" || tab === "investing") wireModeTable();
   if (tab === "screener") wireScreener();
   if (tab === "funds") wireFunds();
+  if (tab === "us") wireUs();
 }
 
 function pickCard(p, i) {
@@ -289,18 +291,20 @@ function buildChart(d) {
 
 // ---------- Stock detail page with interactive chart ----------
 let chart = null, _chartRO = null;
-async function openStock(sym) {
+async function openStock(sym, isUs) {
   const el = $("#detail");
   el.hidden = false; document.body.style.overflow = "hidden";
   el.innerHTML = `<div class="shead"><button onclick="closeStock()">←</button><b>${esc(sym)}</b><span class="muted" id="dsub"></span></div><div class="sbody"><p class="muted">Loading ${esc(sym)}…</p></div>`;
-  let d;
-  try { d = await (await fetch(`data/stocks/${sym}.json?` + Date.now())).json(); }
-  catch {
+  let d = null;
+  const tryFetch = async folder => { try { return await (await fetch(`data/${folder}/${sym}.json?` + Date.now())).json(); } catch { return null; } };
+  d = await tryFetch(isUs ? "us" : "stocks");
+  if (!d) d = await tryFetch(isUs ? "stocks" : "us");  // fall back to the other market
+  if (!d) {
     const uni = UNI && UNI.symbols.find(x => x.symbol === sym);
     const why = uni && !uni.eligible ? `This stock doesn't pass the liquidity gate (${esc(uni.reason)}), so it's not analysed — but you can still research it below.`
       : `Its chart analysis is still being built (history seeds in over the next day or two). Check back soon.`;
     $(".sbody", el).innerHTML = `<div class="card warn"><b>${esc(sym)} — analysis not ready yet</b><br><span class="muted">${why}</span>
-      <div class="card" style="margin-top:10px"><b>Research it now</b> · <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Screener</a> · <a href="https://www.tickertape.in/stocks/${esc(sym.toLowerCase())}" target="_blank" rel="noopener">Tickertape</a> · <a href="https://www.moneycontrol.com/india/stockpricequote/${esc(sym)}" target="_blank" rel="noopener">Moneycontrol</a></div></div>`;
+      <div class="card" style="margin-top:10px"><b>Research it now</b> · <a href="https://www.screener.in/company/${esc(sym)}/" target="_blank" rel="noopener">Screener</a> · <a href="https://finance.yahoo.com/quote/${esc(sym)}" target="_blank" rel="noopener">Yahoo</a></div></div>`;
     return;
   }
   renderStock(el, d);
@@ -310,13 +314,15 @@ window.addEventListener("popstate", () => { if (!$("#detail").hidden) closeStock
 
 function renderStock(el, d) {
   const T = d.trading, I = d.investing, R = d.reading, star = inWatch(d.symbol) ? "on" : "";
+  const cur = d.currency === "USD" ? "$" : "₹";
+  const mkt = d.currency === "USD" ? "S&P 500" : "Nifty 50";
   window._openSym = d.symbol;
   window._openDetail = { symbol: d.symbol, name: d.name, price: d.price, trading_score: T.score, trading_verdict: T.verdict,
     buy_upto: T.buy_upto, stop: T.stop_loss, target_1: T.target_1, investing_score: I.score, investing_verdict: I.verdict,
     rsi: d.indicators && d.indicators.rsi, reading_summary: R.summary, support: R.support, resistance: R.resistance, fundamentals: d.fundamentals };
-  $("#dsub", el).textContent = `₹${num(d.price)} · ${d.day_change >= 0 ? "+" : ""}${(d.day_change * 100).toFixed(2)}% · as of ${d.asof}`;
+  $("#dsub", el).textContent = `${cur}${num(d.price)} · ${d.day_change >= 0 ? "+" : ""}${(d.day_change * 100).toFixed(2)}% · as of ${d.asof}`;
   const rk = d.risk || {};
-  const riskCard = (rk.beta != null || rk.vol_ann != null) ? `<div class="card"><b>Foundational indicators</b> <span class="muted">(vs Nifty 50, ~${rk.sample_days || 0} days)</span>
+  const riskCard = (rk.beta != null || rk.vol_ann != null) ? `<div class="card"><b>Foundational indicators</b> <span class="muted">(vs ${mkt}, ~${rk.sample_days || 0} days)</span>
     <div class="lvl" style="grid-template-columns:auto 1fr auto 1fr;margin-top:6px">
       <span title="How much it moves vs the market. 1 = moves with Nifty, >1 = more volatile, <1 = calmer">Beta</span><span>${rk.beta != null ? rk.beta : "–"}</span>
       <span title="Return above/below what its beta would predict, annualised. Positive = outperformed the market for its risk">Alpha (ann.)</span><span class="${(rk.alpha_ann || 0) >= 0 ? "up" : "down"}">${rk.alpha_ann != null ? (rk.alpha_ann * 100).toFixed(1) + "%" : "–"}</span>
@@ -324,7 +330,11 @@ function renderStock(el, d) {
       <span title="Annualised volatility (std dev of daily returns)">Volatility</span><span>${rk.vol_ann != null ? (rk.vol_ann * 100).toFixed(0) + "%" : "–"}</span>
       <span title="Worst peak-to-trough fall in the window">Max drawdown</span><span class="down">${rk.max_drawdown != null ? (rk.max_drawdown * 100).toFixed(0) + "%" : "–"}</span></div>
     <div class="muted" style="font-size:12px;margin-top:6px">Beta &gt;1 = swings more than the market; Alpha &gt;0 = beat the market for its risk level.</div></div>` : "";
-  const fund = d.fundamentals ? `<div class="card"><b>Fundamentals</b><div class="lvl" style="grid-template-columns:auto 1fr auto 1fr">
+  const fa = d.fundamental_analysis;
+  const faCard = fa ? `<div class="card"><b>Fundamental analysis</b> <span class="vd ${/Strong/.test(fa._verdict) ? "buy" : /Weak/.test(fa._verdict) ? "wait" : "dip"}">${esc(fa._verdict)}</span>
+    <div class="reading-row" style="margin-top:8px">${Object.entries(fa).filter(([k]) => k[0] !== "_").map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}</div>
+    <div class="muted" style="font-size:12px;margin-top:6px">These drive the Investing score. Technical levels (above) drive the Trading score.</div></div>` : "";
+  const fund = d.fundamentals ? `<div class="card"><b>Key figures</b><div class="lvl" style="grid-template-columns:auto 1fr auto 1fr">
     <span>P/E</span><span>${num(d.fundamentals.pe, 1)}</span><span>ROE</span><span>${d.fundamentals.roe != null ? (d.fundamentals.roe * 100).toFixed(0) + "%" : "–"}</span>
     <span>Debt/Eq</span><span>${num(d.fundamentals.debt_equity, 0)}</span><span>Rev growth</span><span>${d.fundamentals.rev_growth != null ? (d.fundamentals.rev_growth * 100).toFixed(0) + "%" : "–"}</span>
     <span>Margin</span><span>${d.fundamentals.profit_margin != null ? (d.fundamentals.profit_margin * 100).toFixed(0) + "%" : "–"}</span><span>Div yld</span><span>${d.fundamentals.div_yield != null ? num(d.fundamentals.div_yield, 2) + "%" : "–"}</span></div></div>` : "";
@@ -369,6 +379,7 @@ function renderStock(el, d) {
       <div class="out" id="sizeout"></div>
       <div class="muted" style="font-size:12px">Quantity so that (entry − stop) × qty ≈ your rupee risk. Buy at market up to the "good to buy" price.</div></div>
 
+    ${faCard}
     ${riskCard}
     ${fund}
     <div class="card"><b>Open in</b> · <a href="${esc(d.links.tickertape || "#")}" target="_blank" rel="noopener">Tickertape</a> · <a href="${esc(d.links.screener || "#")}" target="_blank" rel="noopener">Screener</a> · <a href="${esc(d.links.moneycontrol || "#")}" target="_blank" rel="noopener">Moneycontrol</a></div>
@@ -423,6 +434,32 @@ function wireSearch() {
   };
   q.oninput = render; onlyElig.onchange = render; noSme.onchange = render;
   render();
+}
+
+// ---------- US & Global stocks ----------
+function us() {
+  if (!USIDX) return `<h2>US & Global stocks</h2><div class="card muted">US & global stock analysis appears after the next data update.</div>`;
+  return `<h2>US & Global stocks <span class="muted" style="font-size:13px">(${USIDX.count}, in USD)</span></h2>
+    <p class="muted">${esc(USIDX.note)} Tap any for its chart, analysis, beta/alpha (vs S&P 500) and fundamentals.</p>
+    <input id="usq" placeholder="Search US & global stocks / ETFs…" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;margin-bottom:8px">
+    <div id="ustbl"></div>`;
+}
+function wireUs() {
+  if (!USIDX) return;
+  const q = $("#usq"), box = $("#ustbl"); let sortKey = "trading_score", dir = -1;
+  const vlabel = { buy: "BUY", dip: "DIP", wait: "WAIT" };
+  const render = () => {
+    const term = (q.value || "").trim().toLowerCase();
+    let rows = USIDX.rows.filter(r => !term || r.symbol.toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term));
+    rows = [...rows].sort((a, b) => ((a[sortKey] ?? -1) - (b[sortKey] ?? -1)) * dir);
+    box.innerHTML = `<div class="scroll"><table><thead><tr><th data-k="name">Stock</th><th class="n" data-k="close">$</th><th class="n" data-k="day_change">Day</th>
+      <th class="n" data-k="trading_score">Trade</th><th class="n" data-k="investing_score">Invest</th><th data-k="trading_verdict">Call</th></tr></thead><tbody>
+      ${rows.map(r => `<tr class="row" onclick="openStock('${r.symbol}',true)"><td><b>${esc(r.symbol)}</b><br><span class="muted" style="font-size:12px">${esc(r.name)}</span></td>
+      <td class="n">${num(r.close)}</td><td class="n">${pct(r.day_change)}</td><td class="n">${num(r.trading_score, 0)}</td><td class="n">${num(r.investing_score, 0)}</td>
+      <td><span class="vd ${r.trading_verdict}">${vlabel[r.trading_verdict] || "–"}</span></td></tr>`).join("")}</tbody></table></div>`;
+    box.querySelector("thead").onclick = e => { const th = e.target.closest("th"); if (!th) return; const k = th.dataset.k; dir = sortKey === k ? -dir : -1; sortKey = k; render(); };
+  };
+  q.oninput = render; render();
 }
 
 // ---------- Screener: build your own shortlist ----------

@@ -202,6 +202,11 @@ def main():
     except Exception as _ex:
         print("  ! dual-mode build skipped:", str(_ex)[:140])
     try:
+        import build_us
+        build_us.build(now)       # US & global large caps + ETFs, scored via Yahoo
+    except Exception as _ex:
+        print("  ! US build skipped:", str(_ex)[:140])
+    try:
         import backtest
         backtest.run(now)         # weekly-cached backtest of the Trading rule vs Nifty
     except Exception as _ex:
