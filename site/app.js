@@ -18,25 +18,46 @@ const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investi
 const BOTTOM = [["today", "Today", "★"], ["trading", "Trading", "⚡"], ["investing", "Investing", "◈"], ["markets", "Markets", "🌐"], ["more", "More", "☰"]];
 const SECTIONS = { markets: "metals", more: "search" };  // bottom-nav groups map to a starting tab
 
+// fetch JSON with a timeout + cache-bust, so a stuck service worker can never hang the app forever
+async function fetchJSON(url, timeoutMs = 12000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url + (url.includes("?") ? "&" : "?") + "_=" + Date.now(), { signal: ctrl.signal, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+// self-heal: clears service worker + caches and reloads (recovers a stuck/blank installed app)
+async function resetApp() {
+  try { const rs = await navigator.serviceWorker.getRegistrations(); for (const r of rs) await r.unregister(); } catch {}
+  try { const ks = await caches.keys(); for (const k of ks) await caches.delete(k); } catch {}
+  location.reload(true);
+}
+window.resetApp = resetApp;
 async function load() {
   try {
-    const t = Date.now();
-    D = await (await fetch("data/latest.json?" + t)).json();
-    try { TR = await (await fetch("data/track_record.json?" + t)).json(); } catch { TR = { picks: [], summary: {} }; }
-    try { HIST = await (await fetch("data/history.json?" + t)).json(); } catch { HIST = []; }
-    try { UNI = await (await fetch("data/universe.json?" + t)).json(); } catch { UNI = null; }
-    try { MODES = await (await fetch("data/modes.json?" + t)).json(); } catch { MODES = null; }
-    try { IDX = await (await fetch("data/stocks_index.json?" + t)).json(); } catch { IDX = null; }
-    try { BT = await (await fetch("data/backtest.json?" + t)).json(); } catch { BT = null; }
-    try { BRIEF = await (await fetch("data/brief.json?" + t)).json(); } catch { BRIEF = null; }
+    D = await fetchJSON("data/latest.json");
+    try { TR = await fetchJSON("data/track_record.json"); } catch { TR = { picks: [], summary: {} }; }
+    try { HIST = await fetchJSON("data/history.json"); } catch { HIST = []; }
+    try { UNI = await fetchJSON("data/universe.json"); } catch { UNI = null; }
+    try { MODES = await fetchJSON("data/modes.json"); } catch { MODES = null; }
+    try { IDX = await fetchJSON("data/stocks_index.json"); } catch { IDX = null; }
+    try { BT = await fetchJSON("data/backtest.json"); } catch { BT = null; }
+    try { BRIEF = await fetchJSON("data/brief.json"); } catch { BRIEF = null; }
   } catch (e) {
-    $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
+    $("#view").innerHTML = `<div class="card warn"><b>Couldn't load data.</b><br><span class="muted">${esc(e.message)}. Check your connection, or reset the app if it stays blank.</span>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button onclick="location.reload()" style="background:var(--accent);color:#fff;border:0;border-radius:9px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer">Reload</button>
+        <button onclick="resetApp()" style="background:var(--chip);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px 16px;font:inherit;cursor:pointer">Reset app (clear cache)</button>
+      </div></div>`;
+    return;
   }
   const g = new Date(D.generated_at);
   const h = UNI && UNI.health;
   const badge = h ? `<span class="chip ${h.status === "ok" ? "BUY" : "HOLD"}" title="${esc((h.issues || []).join("; ") || "Data checks passed")}">${h.status === "ok" ? "✓ data ok" : "⚠ data"}</span> ` : "";
   $("#stamp").innerHTML = badge + "Updated " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day data";
-  $("#foot").innerHTML = esc(D.disclaimer) + " Data: Yahoo Finance, AMFI via mfapi.in. May be delayed or incomplete.";
+  $("#foot").innerHTML = esc(D.disclaimer) + " Data: Yahoo Finance, AMFI via mfapi.in. May be delayed or incomplete. · <a href=\"#\" onclick=\"resetApp();return false\">Reset app</a> if it misbehaves.";
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("");
   $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) go(b.dataset.t); };
   $("#bottomnav").innerHTML = BOTTOM.map(([k, l, ic]) => `<button data-t="${k}"><span class="ic">${ic}</span>${l}</button>`).join("");
