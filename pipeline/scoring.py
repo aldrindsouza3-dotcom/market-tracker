@@ -162,6 +162,34 @@ def investing_plan(t: dict, f: dict | None, score: float) -> dict:
             "applies": "Long-term view; price levels are guides, not tight stops."}
 
 
+# ---------------- foundational risk metrics (vs Nifty 50) ----------------
+def risk_metrics(closes, dates, nifty_ret: dict) -> dict:
+    """Beta, alpha (annualised), R^2, annualised volatility vs the Nifty 50.
+    closes/dates: the stock's daily close series; nifty_ret: {date -> daily return}."""
+    sret = {}
+    for i in range(1, len(closes)):
+        c0, c1 = closes[i - 1], closes[i]
+        if c0 and not np.isnan(c0) and not np.isnan(c1):
+            sret[str(dates[i])] = c1 / c0 - 1
+    common = [d for d in sret if d in nifty_ret]
+    if len(common) < 120:
+        return {}
+    s = np.array([sret[d] for d in common]); m = np.array([nifty_ret[d] for d in common])
+    var = float(m.var())
+    out = {"vol_ann": round(float(s.std() * np.sqrt(252)), 3)}
+    if var > 0:
+        beta = float(np.cov(s, m)[0, 1] / var)
+        out["beta"] = round(beta, 2)
+        out["alpha_ann"] = round(float((s.mean() - beta * m.mean()) * 252), 3)
+        corr = float(np.corrcoef(s, m)[0, 1])
+        out["r_squared"] = round(corr ** 2, 2)
+    # max drawdown over the window
+    eq = np.cumprod(1 + s); peak = np.maximum.accumulate(eq)
+    out["max_drawdown"] = round(float(((eq - peak) / peak).min()), 3)
+    out["sample_days"] = len(common)
+    return out
+
+
 # ---------------- rule-based chart reading ----------------
 def chart_reading(df: pd.DataFrame, t: dict, levels: dict | None = None) -> dict:
     """Plain-language, rule-derived reading. Every line carries its numbers."""

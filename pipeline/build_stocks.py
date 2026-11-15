@@ -100,6 +100,24 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
         fcache = _load_fund_cache()
         _refresh_fundamentals(elig_syms, fcache, now.isoformat(), FUND_PER_RUN)
 
+        # Nifty 50 daily returns, for beta/alpha (fetched once per run)
+        nifty_ret = {}
+        try:
+            import yfinance as yf
+            nd = yf.download("^NSEI", period="3y", interval="1d", auto_adjust=True, progress=False)
+            nc = nd["Close"]
+            if hasattr(nc, "columns"):
+                nc = nc.iloc[:, 0]
+            nc = nc.dropna()
+            prev = None
+            for ts, v in nc.items():
+                d = ts.date().isoformat()
+                if prev:
+                    nifty_ret[d] = float(v) / prev - 1
+                prev = float(v)
+        except Exception as ex:
+            print("  ! nifty returns unavailable (beta/alpha skipped):", str(ex)[:80])
+
         # 3) score each eligible symbol that has history
         index_rows, scored = [], 0
         meta = {u["symbol"]: u for u in uni}
@@ -118,6 +136,7 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
             tplan = SC.trading_plan(t, tscore)
             iplan = SC.investing_plan(t, f, iscore)
             reading = SC.chart_reading(ohlc, t)
+            risk = SC.risk_metrics(h["close"].tolist(), h["date"].tolist(), nifty_ret) if nifty_ret else {}
             u = meta.get(sym, {})
             row = {"symbol": sym, "name": u.get("name", sym), "sector": (f or {}).get("sector"),
                    "close": round(t["price"], 2), "day_change": t["day_change"],
@@ -137,7 +156,7 @@ def build(now: dt.datetime, universe_rows: list[dict] | None = None) -> dict | N
                       "price": round(t["price"], 2), "day_change": t["day_change"], "days_history": t["days"],
                       "indicators": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in t.items()},
                       "trading": {"score": tscore, **tplan}, "investing": {"score": iscore, "has_fundamentals": had_f, **iplan},
-                      "reading": reading, "fundamentals": f,
+                      "reading": reading, "risk": risk, "fundamentals": f,
                       "links": {"tickertape": u.get("tickertape"), "screener": u.get("screener"), "moneycontrol": u.get("moneycontrol")},
                       "ohlc": _compact_ohlc(h),
                       "disclaimer": "Research aid, not investment advice. End-of-day data."}

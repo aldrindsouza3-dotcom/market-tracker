@@ -300,6 +300,15 @@ function renderStock(el, d) {
     buy_upto: T.buy_upto, stop: T.stop_loss, target_1: T.target_1, investing_score: I.score, investing_verdict: I.verdict,
     rsi: d.indicators && d.indicators.rsi, reading_summary: R.summary, support: R.support, resistance: R.resistance, fundamentals: d.fundamentals };
   $("#dsub", el).textContent = `₹${num(d.price)} · ${d.day_change >= 0 ? "+" : ""}${(d.day_change * 100).toFixed(2)}% · as of ${d.asof}`;
+  const rk = d.risk || {};
+  const riskCard = (rk.beta != null || rk.vol_ann != null) ? `<div class="card"><b>Foundational indicators</b> <span class="muted">(vs Nifty 50, ~${rk.sample_days || 0} days)</span>
+    <div class="lvl" style="grid-template-columns:auto 1fr auto 1fr;margin-top:6px">
+      <span title="How much it moves vs the market. 1 = moves with Nifty, >1 = more volatile, <1 = calmer">Beta</span><span>${rk.beta != null ? rk.beta : "–"}</span>
+      <span title="Return above/below what its beta would predict, annualised. Positive = outperformed the market for its risk">Alpha (ann.)</span><span class="${(rk.alpha_ann || 0) >= 0 ? "up" : "down"}">${rk.alpha_ann != null ? (rk.alpha_ann * 100).toFixed(1) + "%" : "–"}</span>
+      <span title="How much of the move is explained by the market (0-1)">R²</span><span>${rk.r_squared != null ? rk.r_squared : "–"}</span>
+      <span title="Annualised volatility (std dev of daily returns)">Volatility</span><span>${rk.vol_ann != null ? (rk.vol_ann * 100).toFixed(0) + "%" : "–"}</span>
+      <span title="Worst peak-to-trough fall in the window">Max drawdown</span><span class="down">${rk.max_drawdown != null ? (rk.max_drawdown * 100).toFixed(0) + "%" : "–"}</span></div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Beta &gt;1 = swings more than the market; Alpha &gt;0 = beat the market for its risk level.</div></div>` : "";
   const fund = d.fundamentals ? `<div class="card"><b>Fundamentals</b><div class="lvl" style="grid-template-columns:auto 1fr auto 1fr">
     <span>P/E</span><span>${num(d.fundamentals.pe, 1)}</span><span>ROE</span><span>${d.fundamentals.roe != null ? (d.fundamentals.roe * 100).toFixed(0) + "%" : "–"}</span>
     <span>Debt/Eq</span><span>${num(d.fundamentals.debt_equity, 0)}</span><span>Rev growth</span><span>${d.fundamentals.rev_growth != null ? (d.fundamentals.rev_growth * 100).toFixed(0) + "%" : "–"}</span>
@@ -345,6 +354,7 @@ function renderStock(el, d) {
       <div class="out" id="sizeout"></div>
       <div class="muted" style="font-size:12px">Quantity so that (entry − stop) × qty ≈ your rupee risk. Buy at market up to the "good to buy" price.</div></div>
 
+    ${riskCard}
     ${fund}
     <div class="card"><b>Open in</b> · <a href="${esc(d.links.tickertape || "#")}" target="_blank" rel="noopener">Tickertape</a> · <a href="${esc(d.links.screener || "#")}" target="_blank" rel="noopener">Screener</a> · <a href="${esc(d.links.moneycontrol || "#")}" target="_blank" rel="noopener">Moneycontrol</a></div>
     <p class="muted" style="font-size:12px">${esc(d.disclaimer)}</p>`;
@@ -370,6 +380,7 @@ function search() {
   if (!UNI) return `<div class="card">The full stock list will appear after the next data update.</div>`;
   return `<h2>All NSE stocks <span class="muted" style="font-size:13px">(${UNI.total}, as of ${UNI.asof})</span></h2>
   <p class="muted">${UNI.eligible} pass the liquidity gate and are eligible for picks. The rest stay searchable but are labelled — thin or small stocks are riskier. Source: ${esc(UNI.source)} bhavcopy.</p>
+  <p class="muted" style="font-size:12px;margin:-4px 0 6px">Tap any stock for its chart, analysis and foundational indicators (beta, alpha, volatility).</p>
   <input id="q" placeholder="Search ${UNI.total} stocks by name or symbol…" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:inherit;margin-bottom:6px">
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
     <label class="muted" style="font-size:13px"><input type="checkbox" id="onlyElig"> Eligible only</label>
@@ -388,10 +399,10 @@ function wireSearch() {
     const show = rows.slice(0, 200);
     res.innerHTML = `<div class="muted" style="font-size:12px;margin-bottom:6px">${rows.length} match${rows.length === 1 ? "" : "es"}${rows.length > 200 ? " — showing first 200" : ""}</div>` +
       `<div class="scroll"><table><thead><tr><th>Symbol</th><th>Name</th><th class="n">Close ₹</th><th class="n">Day</th><th class="n">20d ₹cr</th><th>Status</th><th>Links</th></tr></thead><tbody>` +
-      show.map(r => `<tr><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name)}</td><td class="n">${r.close == null ? "–" : num(r.close)}</td>
+      show.map(r => `<tr class="row" onclick="openStock('${r.symbol}')"><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name)}</td><td class="n">${r.close == null ? "–" : num(r.close)}</td>
         <td class="n">${pct(r.day_change)}</td><td class="n">${num(r.med_turnover_cr, 1)}</td>
         <td>${r.eligible ? '<span class="chip BUY">Eligible</span>' : `<span class="chip HOLD" title="${esc(r.reason)}">${esc(r.board === "SME" ? "SME" : "Not eligible")}</span>`}</td>
-        <td style="font-size:12px"><a href="${esc(r.tickertape)}" target="_blank" rel="noopener">TT</a> · <a href="${esc(r.screener)}" target="_blank" rel="noopener">Scr</a> · <a href="${esc(r.moneycontrol)}" target="_blank" rel="noopener">MC</a></td></tr>`).join("") +
+        <td style="font-size:12px" onclick="event.stopPropagation()"><a href="${esc(r.tickertape)}" target="_blank" rel="noopener">TT</a> · <a href="${esc(r.screener)}" target="_blank" rel="noopener">Scr</a> · <a href="${esc(r.moneycontrol)}" target="_blank" rel="noopener">MC</a></td></tr>`).join("") +
       `</tbody></table></div>`;
     if (!rows.length) res.innerHTML = `<div class="muted">No matches.</div>`;
   };
