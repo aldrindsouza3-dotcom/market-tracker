@@ -6,3 +6,4 @@ html5lib
 beautifulsoup4
 pywebpush
 pyarrow
+pytest

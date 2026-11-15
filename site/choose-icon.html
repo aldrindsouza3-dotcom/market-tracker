@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choose app icon</title><style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--muted:#667085;--line:#e4e7ec;--accent:#0f766e}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--ink:#e8ecf1;--muted:#98a2b3;--line:#262c36;--accent:#2dd4bf}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,Segoe UI,Roboto,sans-serif;padding:20px;max-width:720px;margin:auto}
+h1{font-size:20px}.row{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+.opt{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;flex:1;min-width:180px}
+.opt.cur{border-color:var(--accent);border-width:2px}
+.sizes{display:flex;gap:12px;align-items:center;justify-content:center;margin:10px 0}
+.sizes img{border-radius:22%}
+.tag{font-size:12px;color:var(--muted)}.badge{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:2px 8px;font-size:12px}
+code{background:var(--line);padding:1px 6px;border-radius:5px;font-size:13px}
+</style></head><body>
+<h1>App icon — 3 options</h1>
+<p class="tag">Option 3 is the current default. To switch, copy the chosen file over the main icon names and redeploy (one line below each).</p>
+<div class="row">
+  <div class="opt"><div class="sizes"><img src="icon_options/opt1.png" width="88" height="88"><img src="icon_options/opt1.png" width="48" height="48"><img src="icon_options/opt1.png" width="28" height="28"></div>
+    <b>Option 1 — Bars &amp; trend</b><div class="tag">Teal, ascending bars with a rising line</div>
+    <p><code>cp icon_options/opt1.png icon-512.png</code></p></div>
+  <div class="opt"><div class="sizes"><img src="icon_options/opt2.png" width="88" height="88"><img src="icon_options/opt2.png" width="48" height="48"><img src="icon_options/opt2.png" width="28" height="28"></div>
+    <b>Option 2 — "M" monogram</b><div class="tag">Indigo M with a green up-arrow</div>
+    <p><code>cp icon_options/opt2.png icon-512.png</code></p></div>
+  <div class="opt cur"><div class="sizes"><img src="icon-512.png" width="88" height="88"><img src="icon-512.png" width="48" height="48"><img src="icon-512.png" width="28" height="28"></div>
+    <b>Option 3 — Candle &amp; trend</b> <span class="badge">current</span><div class="tag">Green gradient, bold up-candle</div>
+    <p class="tag">Already applied.</p></div>
+</div>
+<p class="tag">All are provided at 192/512 px with maskable (safe-zone) and monochrome variants, plus a favicon. Tell me the number and I'll make it the default across the manifest, Apple touch icon, favicon and splash colour.</p>
+</body></html>

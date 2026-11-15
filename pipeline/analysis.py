@@ -7,10 +7,11 @@ import pandas as pd
 
 def rsi(close: pd.Series, n: int = 14) -> float:
     d = close.diff()
-    up = d.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
-    dn = (-d.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
-    rs = up / dn.replace(0, np.nan)
-    return float((100 - 100 / (1 + rs)).iloc[-1])
+    up = float(d.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean().iloc[-1])
+    dn = float((-d.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean().iloc[-1])
+    if dn == 0:
+        return 100.0 if up > 0 else 50.0  # no losses -> maxed; flat -> neutral
+    return 100 - 100 / (1 + up / dn)
 
 
 def atr(df: pd.DataFrame, n: int = 14) -> float:
