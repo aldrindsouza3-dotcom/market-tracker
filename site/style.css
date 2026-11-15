@@ -76,8 +76,8 @@ footer{padding:24px 16px 40px}
 .sheet .shead button{background:none;border:0;color:var(--ink);font-size:20px;cursor:pointer;padding:4px 8px}
 .sheet .sbody{max-width:1000px;margin:0 auto;padding:16px 16px 90px}
 .chartbox{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px;margin:10px 0}
-.chartwrap{width:100%;height:320px}
-.volwrap{width:100%;height:90px}
+.chartwrap{width:100%;height:360px}
+.volwrap{width:100%;height:80px}
 .ranges{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .ranges button,.inds button{background:var(--chip);border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
 .ranges button.on,.inds button.on{background:var(--accent);color:#fff;border-color:var(--accent)}

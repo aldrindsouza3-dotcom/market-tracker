@@ -229,12 +229,18 @@ function buildChart(d) {
   const LC = window.LightweightCharts;
   const host = $("#chart"); host.innerHTML = ""; $("#vol").innerHTML = "";
   if (chart) { try { chart.remove(); } catch {} }
-  const opts = { layout: { background: { color: "transparent" }, textColor: dark ? "#98a2b3" : "#667085" },
-    grid: { vertLines: { color: dark ? "#1f2630" : "#eef2f6" }, horzLines: { color: dark ? "#1f2630" : "#eef2f6" } },
-    rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false }, crosshair: { mode: 0 },
+  const gridCol = dark ? "rgba(255,255,255,0.045)" : "rgba(0,0,0,0.05)";
+  const fmtRs = v => Number(v).toLocaleString("en-IN", { maximumFractionDigits: v < 100 ? 2 : 0 });
+  const fmtVol = v => v >= 1e7 ? (v / 1e7).toFixed(1) + "Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v >= 1e3 ? (v / 1e3).toFixed(0) + "K" : String(Math.round(v));
+  const opts = { layout: { background: { color: "transparent" }, textColor: dark ? "#98a2b3" : "#667085", fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif", fontSize: 11 },
+    grid: { vertLines: { color: gridCol }, horzLines: { color: gridCol } },
+    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
+    timeScale: { borderVisible: false, timeVisible: false, secondsVisible: false, fixLeftEdge: true, fixRightEdge: true },
+    crosshair: { mode: 1, vertLine: { labelBackgroundColor: css("--accent"), color: dark ? "#3a4452" : "#c0c8d4", width: 1 }, horzLine: { labelBackgroundColor: css("--accent"), color: dark ? "#3a4452" : "#c0c8d4" } },
+    localization: { priceFormatter: fmtRs },
     autoSize: true };
   chart = LC.createChart(host, opts);
-  const vchart = LC.createChart($("#vol"), { ...opts, rightPriceScale: { borderVisible: false }, timeScale: { visible: false } });
+  const vchart = LC.createChart($("#vol"), { ...opts, crosshair: { mode: 0 }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.15, bottom: 0 } }, timeScale: { visible: false }, localization: { priceFormatter: fmtVol } });
   const times = O.t;
   const full = times.map((t, i) => ({ time: t, open: O.o[i], high: O.h[i], low: O.l[i], close: O.c[i], volume: O.v[i] }))
     .filter(x => x.close != null);
@@ -252,11 +258,11 @@ function buildChart(d) {
       chart._main = chart.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
       chart._main.setData(data.map(x => ({ time: x.time, open: x.open, high: x.high, low: x.low, close: x.close })));
     } else {
-      chart._main = chart.addLineSeries({ color: css("--accent"), lineWidth: 2 });
+      chart._main = chart.addAreaSeries({ lineColor: css("--accent"), topColor: css("--accent") + "55", bottomColor: css("--accent") + "05", lineWidth: 2 });
       chart._main.setData(data.map(x => ({ time: x.time, value: x.close })));
     }
     const closes = data.map(x => x.close);
-    const addSMA = (len, col) => { const v = sma(closes, len); const s = chart.addLineSeries({ color: col, lineWidth: 1, priceLineVisible: false, lastValueVisible: false }); s.setData(data.map((x, i) => v[i] == null ? null : { time: x.time, value: v[i] }).filter(Boolean)); extras.push(s); };
+    const addSMA = (len, col) => { const v = sma(closes, len); const s = chart.addLineSeries({ color: col, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }); s.setData(data.map((x, i) => v[i] == null ? null : { time: x.time, value: v[i] }).filter(Boolean)); extras.push(s); };
     if (state.inds.has("sma20")) addSMA(20, "#f59e0b");
     if (state.inds.has("sma50")) addSMA(50, "#3b82f6");
     if (state.inds.has("sma200")) addSMA(200, "#a855f7");
@@ -267,10 +273,11 @@ function buildChart(d) {
         if (T[k]) chart._main.createPriceLine({ price: T[k], color: col, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: lbl });
       });
     }
-    // volume
+    // volume (semi-transparent so it doesn't shout)
     vchart._v && (() => { try { vchart.removeSeries(vchart._v); } catch {} })();
-    vchart._v = vchart.addHistogramSeries({ priceLineVisible: false });
-    vchart._v.setData(data.map(x => ({ time: x.time, value: x.volume || 0, color: x.close >= x.open ? css("--up") : css("--down") })));
+    vchart._v = vchart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false, priceFormat: { type: "volume" } });
+    const up = css("--up"), dn = css("--down");
+    vchart._v.setData(data.map(x => ({ time: x.time, value: x.volume || 0, color: (x.close >= x.open ? up : dn) + "88" })));
     chart.timeScale().fitContent(); vchart.timeScale().fitContent();
   }
   draw();
