@@ -308,7 +308,7 @@ def build_full_universe(now):
                   "stale_days": stale_days, "absurd_moves": len(absurd), "issues": issues}
         payload = {"generated_at": now.isoformat(), "asof": asof.isoformat(), "source": recent[0][1]["source"].iloc[0],
                    "total": len(uni), "eligible": len(elig), "sme": sum(1 for u in uni if u["board"] == "SME"),
-                   "gate": "Median 20-day turnover >= Rs 5 cr, price >= Rs 10, mainboard, not SME/surveillance",
+                   "gate": "Median 20-day turnover >= Rs 1 cr, price >= Rs 10, mainboard, not SME/surveillance",
                    "health": health, "symbols": uni}
         (OUT / "universe.json").write_text(json.dumps(clean(payload), indent=0), encoding="utf-8")
         print(f"  universe: {len(uni)} symbols ({len(elig)} eligible) as of {asof}")

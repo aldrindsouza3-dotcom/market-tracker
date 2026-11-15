@@ -75,6 +75,7 @@ function load2() {
   if (tab === "search") wireSearch();
   if (tab === "trading" || tab === "investing") wireModeTable();
   if (tab === "screener") wireScreener();
+  if (tab === "funds") wireFunds();
 }
 
 function pickCard(p, i) {
@@ -564,10 +565,77 @@ const metals = () => `<h2>Gold, silver, metals & energy</h2><p class="muted">Glo
   ${reg("metals", [...assetCols("$"), { h: "Type", f: r => esc(r.kind), s: r => r.kind }], D.commodities, planDetail)}`;
 const global = () => `<h2>India</h2>${reg("gi", assetCols(), D.indices.filter(i => i.region === "India"), planDetail)}
   <h2>US, UK, Japan, China & others</h2>${reg("gg", [...assetCols(), { h: "Region", f: r => esc(r.region), s: r => r.region }], D.indices.filter(i => i.region !== "India"), planDetail)}`;
-const funds = () => `<h2>Mutual funds (Direct, Growth)</h2><p class="muted">Ranked on 3-year CAGR, return per unit of volatility, and worst drawdown. Check expense ratio, fund manager and your goal before investing; for equity funds prefer a monthly SIP over a lump sum.</p>
-  ${reg("funds", [{ h: "Fund", f: r => esc(r.name), s: r => r.name }, { h: "Category", f: r => esc(r.category.replace(/^Equity Scheme - /, "")), s: r => r.category },
+function funds() {
+  return `<h2>Mutual funds</h2>
+  <p class="muted">Search <b>every</b> Indian mutual fund (AMFI data) — equity, debt, index, hybrid, gold, diversified. Tap a result for its returns, risk and NAV chart.</p>
+  <input id="mfq" placeholder="Search funds — e.g. 'flexi cap', 'nifty index', 'small cap', 'gold'…" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:inherit;margin-bottom:6px">
+  <div id="mfresults"></div>
+  <h2>Tracked picks <span class="muted" style="font-size:13px">(scored daily)</span></h2>
+  <p class="muted">A curated set ranked on 3-year CAGR, return per unit of volatility and worst drawdown.</p>
+  ${reg("funds", [{ h: "Fund", f: r => `<a href="#" onclick="openFund('${r.code}');return false">${esc(r.name)}</a>`, s: r => r.name }, { h: "Category", f: r => esc((r.category || "").replace(/^Equity Scheme - /, "")), s: r => r.category },
   { h: "NAV", n: 1, f: r => num(r.nav), s: r => r.nav }, { h: "1Y", n: 1, f: r => pct(r.ret_1y, 0), s: r => r.ret_1y }, { h: "3Y CAGR", n: 1, f: r => pct(r.cagr_3y, 1), s: r => r.cagr_3y },
   { h: "5Y CAGR", n: 1, f: r => pct(r.cagr_5y, 1), s: r => r.cagr_5y }, { h: "Max drawdown", n: 1, f: r => pct(r.max_drawdown, 0), s: r => r.max_drawdown }, { h: "Score", f: r => bar(r.score), s: r => r.score }], D.mutual_funds)}`;
+}
+let _mfTimer = null;
+function wireFunds() {
+  const q = $("#mfq"), box = $("#mfresults");
+  if (!q) return;
+  q.oninput = () => {
+    clearTimeout(_mfTimer);
+    const term = q.value.trim();
+    if (term.length < 3) { box.innerHTML = ""; return; }
+    box.innerHTML = `<p class="muted" style="font-size:13px">Searching…</p>`;
+    _mfTimer = setTimeout(async () => {
+      try {
+        const res = await (await fetch("https://api.mfapi.in/mf/search?q=" + encodeURIComponent(term))).json();
+        // prefer Direct Growth plans, dedupe
+        const seen = new Set(); const rows = [];
+        for (const r of res) { const k = r.schemeName.toLowerCase(); if (seen.has(k)) continue; seen.add(k); rows.push(r); }
+        rows.sort((a, b) => (/direct/i.test(b.schemeName) - /direct/i.test(a.schemeName)) || (/growth/i.test(b.schemeName) - /growth/i.test(a.schemeName)));
+        box.innerHTML = `<div class="muted" style="font-size:12px;margin:4px 0">${rows.length} funds</div>` +
+          `<div class="scroll"><table><tbody>${rows.slice(0, 60).map(r => `<tr class="row" onclick="openFund('${r.schemeCode}')"><td>${esc(r.schemeName)}</td></tr>`).join("")}</tbody></table></div>`;
+        if (!rows.length) box.innerHTML = `<p class="muted">No funds match "${esc(term)}".</p>`;
+      } catch (e) { box.innerHTML = `<p class="muted">Search failed: ${esc(e.message)}. Try again.</p>`; }
+    }, 350);
+  };
+}
+async function openFund(code) {
+  const el = $("#detail"); el.hidden = false; document.body.style.overflow = "hidden";
+  el.innerHTML = `<div class="shead"><button onclick="closeStock()">←</button><b>Fund</b></div><div class="sbody"><p class="muted">Loading fund…</p></div>`;
+  let j;
+  try { j = await (await fetch("https://api.mfapi.in/mf/" + code)).json(); }
+  catch { $(".sbody", el).innerHTML = `<div class="card warn">Couldn't load this fund.</div>`; return; }
+  const meta = j.meta || {}, data = (j.data || []).slice().reverse(); // oldest first
+  if (data.length < 30) { $(".sbody", el).innerHTML = `<div class="card warn">Not enough NAV history for ${esc(meta.scheme_name || code)}.</div>`; return; }
+  const navs = data.map(d => parseFloat(d.nav)).filter(v => v > 0);
+  const last = navs[navs.length - 1];
+  const cagr = yrs => { const i = navs.length - 1 - Math.round(252 * yrs); return i >= 0 ? Math.pow(last / navs[i], 1 / yrs) - 1 : null; };
+  const rets = navs.slice(1).map((v, i) => v / navs[i] - 1);
+  const vol = Math.sqrt(rets.slice(-756).reduce((a, b) => a + b * b, 0) / Math.min(756, rets.length)) * Math.sqrt(252);
+  let peak = navs[0], mdd = 0; for (const v of navs) { peak = Math.max(peak, v); mdd = Math.min(mdd, v / peak - 1); }
+  const r1 = cagr(1), r3 = cagr(3), r5 = cagr(5);
+  $(".sbody", el).innerHTML = `
+    <h2 style="margin:0">${esc(meta.scheme_name || code)}</h2>
+    <span class="muted">${esc(meta.fund_house || "")} · ${esc(meta.scheme_category || "")}</span>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kpi"><div class="l">NAV</div><div class="v">₹${num(last)}</div></div>
+      <div class="kpi"><div class="l">1Y return</div><div class="v">${r1 != null ? (r1 * 100).toFixed(1) + "%" : "–"}</div></div>
+      <div class="kpi"><div class="l">3Y CAGR</div><div class="v">${r3 != null ? (r3 * 100).toFixed(1) + "%" : "–"}</div></div>
+      <div class="kpi"><div class="l">5Y CAGR</div><div class="v">${r5 != null ? (r5 * 100).toFixed(1) + "%" : "–"}</div></div>
+      <div class="kpi"><div class="l">Volatility</div><div class="v">${(vol * 100).toFixed(0)}%</div></div>
+      <div class="kpi"><div class="l">Max drawdown</div><div class="v down">${(mdd * 100).toFixed(0)}%</div></div>
+    </div>
+    <div class="chartbox"><div class="chartwrap" id="fchart"></div><div class="muted" style="font-size:12px">NAV history (end-of-day).</div></div>
+    <div class="card muted" style="font-size:13px">For equity funds, a monthly SIP usually beats lump-sum. Check the expense ratio and your goal/horizon. Research aid, not advice.</div>`;
+  // NAV chart
+  try {
+    const host = $("#fchart"); const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const c = window.LightweightCharts.createChart(host, { autoSize: true, layout: { background: { color: "transparent" }, textColor: dark ? "#98a2b3" : "#667085" }, grid: { vertLines: { color: "rgba(128,128,128,.05)" }, horzLines: { color: "rgba(128,128,128,.05)" } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false } });
+    const s = c.addAreaSeries({ lineColor: "#2dd4bf", topColor: "#2dd4bf55", bottomColor: "#2dd4bf05", lineWidth: 2 });
+    s.setData(data.map(d => ({ time: d.date.split("-").reverse().join("-"), value: parseFloat(d.nav) })).filter(x => x.value > 0));
+    c.timeScale().fitContent();
+  } catch {}
+}
 const fx = () => `<h2>Currencies vs INR</h2><p class="muted">Price = rupees per 1 unit. A rising number means the rupee is weakening (good for exporters / foreign holdings, bad for importers & overseas travel).</p>
   ${reg("fx", [{ h: "Currency", f: r => esc(r.name), s: r => r.name }, { h: "Rate", n: 1, f: r => num(r.price, 3), s: r => r.price }, { h: "1M", n: 1, f: r => pct(r.ret_1m), s: r => r.ret_1m }, { h: "3M", n: 1, f: r => pct(r.ret_3m), s: r => r.ret_3m },
   { h: "1Y", n: 1, f: r => pct(r.ret_1y), s: r => r.ret_1y }, { h: "View", f: r => esc(r.inr_view || "Dollar strength gauge"), s: r => r.name }], D.currencies)}

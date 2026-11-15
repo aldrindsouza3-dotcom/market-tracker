@@ -199,7 +199,7 @@ def recent_bhavcopies(n_days: int, s: requests.Session | None = None, scan: int 
 
 
 def build_universe(recent: list[tuple[dt.date, pd.DataFrame]], sec: pd.DataFrame,
-                   min_turnover_cr: float = 5.0) -> list[dict]:
+                   min_turnover_cr: float = 1.0) -> list[dict]:
     """From recent bhavcopies, one row per symbol with last close, day change, 20-day median turnover,
     eligibility (liquidity gate) and reason. `recent` is newest-first."""
     if not recent:
@@ -238,7 +238,7 @@ def build_universe(recent: list[tuple[dt.date, pd.DataFrame]], sec: pd.DataFrame
 
 # ---------------- liquidity gate ----------------
 def liquidity_gate(med_turnover_20d: float, last_price: float, days_history: int,
-                   series: str, min_turnover_cr: float = 5.0, min_price: float = 10.0,
+                   series: str, min_turnover_cr: float = 1.0, min_price: float = 10.0,
                    restricted: bool = False) -> tuple[bool, str]:
     """Eligible for recommendations? Returns (ok, reason-if-not)."""
     if series in SME:
