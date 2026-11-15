@@ -3,3 +3,4 @@ __pycache__/
 .claude/
 VAPID_PRIVATE_KEY.txt
 push_subscription.txt
+cache/
