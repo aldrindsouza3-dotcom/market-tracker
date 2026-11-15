@@ -195,9 +195,10 @@ def main():
     (OUT / "latest.json").write_text(json.dumps(clean(out), indent=1), encoding="utf-8")
 
     build_full_universe(now)  # whole-market searchable index + liquidity gate (safe, isolated)
+    modes = None
     try:
         import build_stocks
-        build_stocks.build(now)   # dual Trading/Investing scoring + per-symbol detail + chart reading
+        modes = build_stocks.build(now)   # dual Trading/Investing scoring + per-symbol detail + chart reading
     except Exception as _ex:
         print("  ! dual-mode build skipped:", str(_ex)[:140])
     try:
@@ -208,19 +209,74 @@ def main():
     append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec)
     update_track_record(now, top5, px)
 
+    # AI market brief + why-selected rationale (optional; only if ANTHROPIC_API_KEY set)
+    brief = build_ai_brief(now, regime, breadth, overview, modes)
+
     print(f"Regime {regime}; Top 5:")
     for t in top5:
         print(f"  {t['kind']:12} {t['name']:38} score {t['score']:5.1f}  {t['signal']}")
     if not args.no_notify:
-        lines = [f"Market: {regime} (Nifty-50 above 200DMA: {breadth:.0%})" if breadth is not None else f"Market: {regime}"]
+        send_daily_notification(now, regime, breadth, modes, top5, brief)
+
+
+def build_ai_brief(now, regime, breadth, overview, modes):
+    """Generate and publish site/data/brief.json via Claude (if key present). Returns the brief dict or None."""
+    try:
+        import ai
+        ctx = {"date": now.strftime("%d %b %Y"), "regime": regime,
+               "breadth_above_200dma": round(breadth, 2) if breadth is not None else None,
+               "advancers": overview["advancers"], "decliners": overview["decliners"],
+               "snapshot": {k: (v and {"price": v["price"], "day_pct": round(v["day"] * 100, 2)}) for k, v in overview["snapshot"].items()},
+               "trading_top5": [{"symbol": r["symbol"], "name": r["name"], "score": r["trading_score"],
+                                 "verdict": r.get("trading_verdict_txt"), "buy_upto": r.get("trading_buy_upto"),
+                                 "stop": r.get("trading_stop"), "rsi": r.get("rsi"), "day_pct": round((r.get("day_change") or 0) * 100, 2)}
+                                for r in (modes.get("trading_top5", []) if modes else [])],
+               "investing_top5": [{"symbol": r["symbol"], "name": r["name"], "score": r["investing_score"],
+                                   "verdict": r.get("investing_verdict_txt"), "ret_1y_pct": round((r.get("ret_1y") or 0) * 100, 1),
+                                   "sector": r.get("sector")}
+                                  for r in (modes.get("investing_top5", []) if modes else [])]}
+        brief = ai.market_brief(ctx)
+        if brief:
+            brief["generated_at"] = now.isoformat()
+            (OUT / "brief.json").write_text(json.dumps(clean(brief)), encoding="utf-8")
+            print("  AI brief written (model:", brief.get("model"), ")")
+        return brief
+    except Exception as ex:
+        print("  ! AI brief skipped:", str(ex)[:140])
+        return None
+
+
+def send_daily_notification(now, regime, breadth, modes, top5, brief):
+    """One daily push with BOTH shortlists (trading + investing) and a plain-language why."""
+    head = f"Markets: {regime}" + (f" · {breadth:.0%} of stocks above 200-DMA" if breadth is not None else "")
+    lines = [head]
+    if brief and brief.get("brief"):
+        lines.append("")
+        lines.append(brief["brief"])
+    treasons = (brief or {}).get("trading_reasons", {})
+    ireasons = (brief or {}).get("investing_reasons", {})
+    tt = (modes or {}).get("trading_top5", [])
+    it = (modes or {}).get("investing_top5", [])
+    if tt:
+        lines.append("")
+        lines.append("⚡ TRADING shortlist (swing):")
+        for r in tt[:5]:
+            why = treasons.get(r["symbol"]) or f"{r.get('trading_verdict_txt', 'setup')}"
+            upto = f" (buy ≤ ₹{r['trading_buy_upto']:.0f})" if r.get("trading_buy_upto") else ""
+            lines.append(f"• {r['name']}{upto} — {why}")
+    if it:
+        lines.append("")
+        lines.append("◈ INVESTING shortlist (long-term):")
+        for r in it[:5]:
+            why = ireasons.get(r["symbol"]) or f"{r.get('investing_verdict_txt', 'quality + trend')}"
+            lines.append(f"• {r['name']} — {why}")
+    if not tt and not it:  # fallback to the legacy Top 5 if dual-mode isn't ready yet
         for i, t in enumerate(top5, 1):
-            lvl = ""
-            if t.get("stop_loss"):
-                lvl = f" | buy {t['entry_low']:.0f}-{t['entry_high']:.0f}, SL {t['stop_loss']:.0f}, T1 {t['target_1']:.0f}"
-            lines.append(f"{i}. {t['name']} [{t['kind']}] {t['signal']}{lvl}")
-        lines.append(DISCLAIMER)
-        sent = N.send_all(f"Top 5 picks - {now:%d %b}", "\n".join(lines), SITE_URL or None)
-        print("Notified via:", sent or "nothing (no channel configured)")
+            lines.append(f"{i}. {t['name']} [{t['kind']}] {t['signal']}")
+    lines.append("")
+    lines.append(DISCLAIMER)
+    sent = N.send_all(f"Daily shortlist — {now:%d %b}", "\n".join(lines), SITE_URL or None)
+    print("Notified via:", sent or "nothing (no channel configured)")
 
 
 def build_full_universe(now):
