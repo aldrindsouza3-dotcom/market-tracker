@@ -8,8 +8,8 @@
    "stop": 462.7,
    "target": 515.57,
    "status": "OPEN",
-   "last": 490.3999938964844,
-   "pnl_pct": 1.35
+   "last": 488.54998779296875,
+   "pnl_pct": 0.97
   },
   {
    "date": "2026-11-11",
@@ -19,8 +19,8 @@
    "stop": 1678.75,
    "target": 1926.88,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": -0.22
+   "last": 1764.0,
+   "pnl_pct": -0.79
   },
   {
    "date": "2026-11-11",
@@ -30,8 +30,8 @@
    "stop": 10540.04,
    "target": 12283.68,
    "status": "OPEN",
-   "last": 11485.0,
-   "pnl_pct": 2.2
+   "last": 11442.0,
+   "pnl_pct": 1.82
   },
   {
    "date": "2026-11-11",
@@ -41,8 +41,8 @@
    "stop": 1818.52,
    "target": 2077.73,
    "status": "OPEN",
-   "last": 1930.0,
-   "pnl_pct": 0.41
+   "last": 1903.300048828125,
+   "pnl_pct": -0.98
   },
   {
    "date": "2026-11-11",
@@ -52,8 +52,8 @@
    "stop": 1317.62,
    "target": 1518.31,
    "status": "OPEN",
-   "last": 1380.800048828125,
-   "pnl_pct": -1.22
+   "last": 1378.0,
+   "pnl_pct": -1.42
   },
   {
    "date": "2026-11-12",
@@ -63,8 +63,8 @@
    "stop": 1677.69,
    "target": 1918.46,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": 0.0
+   "last": 1764.0,
+   "pnl_pct": -0.56
   },
   {
    "date": "2026-11-12",
@@ -74,8 +74,8 @@
    "stop": 1897.82,
    "target": 2238.27,
    "status": "OPEN",
-   "last": 2034.0,
-   "pnl_pct": 0.0
+   "last": 2028.0,
+   "pnl_pct": -0.29
   },
   {
    "date": "2026-11-12",
@@ -85,8 +85,8 @@
    "stop": 1136.36,
    "target": 1360.46,
    "status": "OPEN",
-   "last": 1226.0,
-   "pnl_pct": 0.0
+   "last": 1220.0,
+   "pnl_pct": -0.49
   },
   {
    "date": "2026-11-13",
@@ -96,8 +96,8 @@
    "stop": 1689.25,
    "target": 1937.38,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": -0.81
+   "last": 1764.0,
+   "pnl_pct": -1.37
   },
   {
    "date": "2026-11-13",
@@ -107,8 +107,8 @@
    "stop": 1879.45,
    "target": 2224.58,
    "status": "OPEN",
-   "last": 2034.0,
-   "pnl_pct": 0.82
+   "last": 2028.0,
+   "pnl_pct": 0.52
   },
   {
    "date": "2026-11-13",
@@ -118,8 +118,8 @@
    "stop": 828.5,
    "target": 939.75,
    "status": "OPEN",
-   "last": 882.0,
-   "pnl_pct": 1.03
+   "last": 890.2999877929688,
+   "pnl_pct": 1.98
   },
   {
    "date": "2026-11-14",
@@ -129,8 +129,8 @@
    "stop": 1677.69,
    "target": 1918.46,
    "status": "OPEN",
-   "last": 1774.0,
-   "pnl_pct": 0.0
+   "last": 1764.0,
+   "pnl_pct": -0.56
   },
   {
    "date": "2026-11-14",
@@ -140,8 +140,8 @@
    "stop": 1897.82,
    "target": 2238.27,
    "status": "OPEN",
-   "last": 2034.0,
-   "pnl_pct": 0.0
+   "last": 2028.0,
+   "pnl_pct": -0.29
   },
   {
    "date": "2026-11-14",
@@ -151,13 +151,46 @@
    "stop": 1136.36,
    "target": 1360.46,
    "status": "OPEN",
-   "last": 1226.0,
+   "last": 1220.0,
+   "pnl_pct": -0.49
+  },
+  {
+   "date": "2026-11-15",
+   "symbol": "TECHM.NS",
+   "name": "Tech Mahindra",
+   "entry": 1764.0,
+   "stop": 1670.52,
+   "target": 1904.23,
+   "status": "OPEN",
+   "last": 1764.0,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-15",
+   "symbol": "COFORGE.NS",
+   "name": "Coforge",
+   "entry": 2028.0,
+   "stop": 1894.56,
+   "target": 2228.15,
+   "status": "OPEN",
+   "last": 2028.0,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-15",
+   "symbol": "KOTAKBANK.NS",
+   "name": "Kotak Mahindra Bank",
+   "entry": 488.54998779296875,
+   "stop": 468.11,
+   "target": 519.21,
+   "status": "OPEN",
+   "last": 488.54998779296875,
    "pnl_pct": 0.0
   }
  ],
  "summary": {
-  "total": 14,
-  "open": 14,
+  "total": 17,
+  "open": 17,
   "hit_rate": null
  }
 }

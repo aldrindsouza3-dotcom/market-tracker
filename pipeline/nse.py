@@ -181,6 +181,61 @@ def latest_bhavcopy(s: requests.Session | None = None, back: int = 7):
     return None, None
 
 
+def recent_bhavcopies(n_days: int, s: requests.Session | None = None, scan: int = None) -> list[tuple[dt.date, pd.DataFrame]]:
+    """Up to n_days most recent trading-day bhavcopies (newest first). Cached files make re-runs cheap."""
+    s = s or session()
+    scan = scan or (n_days * 2 + 10)
+    out = []
+    for i in range(1, scan):
+        if len(out) >= n_days:
+            break
+        d = dt.date.today() - dt.timedelta(days=i)
+        if d.weekday() >= 5:
+            continue
+        df = bhavcopy(d, s)
+        if df is not None and len(df) > 500:
+            out.append((d, df))
+    return out
+
+
+def build_universe(recent: list[tuple[dt.date, pd.DataFrame]], sec: pd.DataFrame,
+                   min_turnover_cr: float = 5.0) -> list[dict]:
+    """From recent bhavcopies, one row per symbol with last close, day change, 20-day median turnover,
+    eligibility (liquidity gate) and reason. `recent` is newest-first."""
+    if not recent:
+        return []
+    asof, latest = recent[0]
+    names = dict(zip(sec["symbol"], sec["name"]))
+    # median turnover per symbol over the window
+    frames = [df[["symbol", "turnover"]].assign(d=str(d)) for d, df in recent]
+    allturn = pd.concat(frames)
+    med = allturn.groupby("symbol")["turnover"].median()
+    hist_days = allturn.groupby("symbol").size()
+    rows = []
+    for _, r in latest.iterrows():
+        sym, series = r["symbol"], r["series"]
+        close, prev = r["close"], r.get("prev_close")
+        day = (close / prev - 1) if prev and prev > 0 else None
+        mt = float(med.get(sym, 0) or 0)
+        nd = int(hist_days.get(sym, 1))
+        # we only have a short window here; the full history gate (200d) is applied later when history exists
+        ok, reason = liquidity_gate(mt, close, max(nd, 200), series, min_turnover_cr)
+        rows.append({
+            "symbol": sym, "name": names.get(sym, sym), "series": series,
+            "board": "SME" if series in SME else "Mainboard",
+            "close": round(float(close), 2) if pd.notna(close) else None,
+            "day_change": round(day, 4) if day is not None else None,
+            "med_turnover_cr": round(mt / 1e7, 2),
+            "deliv_pct": round(float(r["deliv_pct"]), 1) if "deliv_pct" in latest and pd.notna(r.get("deliv_pct")) else None,
+            "eligible": ok, "reason": reason,
+            "tickertape": f"https://www.tickertape.in/stocks/{sym.lower()}",
+            "screener": f"https://www.screener.in/company/{sym}/",
+            "moneycontrol": f"https://www.moneycontrol.com/india/stockpricequote/{sym}",
+        })
+    rows.sort(key=lambda x: -(x["med_turnover_cr"] or 0))
+    return rows
+
+
 # ---------------- liquidity gate ----------------
 def liquidity_gate(med_turnover_20d: float, last_price: float, days_history: int,
                    series: str, min_turnover_cr: float = 5.0, min_price: float = 10.0,

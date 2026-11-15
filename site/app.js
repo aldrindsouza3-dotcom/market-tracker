@@ -6,10 +6,10 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, tab = "today";
 const sortState = {};
 
-const TABS = [["today", "Today"], ["overview", "Overview"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
+const TABS = [["today", "Today"], ["overview", "Overview"], ["search", "All stocks"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
 ["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["news", "News"], ["how", "How it works"]];
 
 async function load() {
@@ -18,6 +18,7 @@ async function load() {
     D = await (await fetch("data/latest.json?" + t)).json();
     try { TR = await (await fetch("data/track_record.json?" + t)).json(); } catch { TR = { picks: [], summary: {} }; }
     try { HIST = await (await fetch("data/history.json?" + t)).json(); } catch { HIST = []; }
+    try { UNI = await (await fetch("data/universe.json?" + t)).json(); } catch { UNI = null; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
   }
@@ -30,8 +31,9 @@ async function load() {
 }
 function load2() {
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
-  $("#view").innerHTML = ({ today, overview, stocks, funds, metals, fx, global, ipo, track, news, how }[tab])();
+  $("#view").innerHTML = ({ today, overview, search, stocks, funds, metals, fx, global, ipo, track, news, how }[tab])();
   wireTables();
+  if (tab === "search") wireSearch();
 }
 
 function pickCard(p, i) {
@@ -103,6 +105,39 @@ function overview() {
         <div class="muted" style="font-size:12px">${HIST.length ? "latest " + num(HIST[HIST.length - 1][key], key === "breadth" ? 2 : 0) : ""}</div></div>`).join("")}
   </div>
   <p class="muted">All figures from the latest end-of-day run. "Market breadth" = share of tracked Indian stocks above their 200-day average (a breadth above ~0.6 is healthy, below ~0.4 is weak).</p>`;
+}
+
+function search() {
+  if (!UNI) return `<div class="card">The full stock list will appear after the next data update.</div>`;
+  return `<h2>All NSE stocks <span class="muted" style="font-size:13px">(${UNI.total}, as of ${UNI.asof})</span></h2>
+  <p class="muted">${UNI.eligible} pass the liquidity gate and are eligible for picks. The rest stay searchable but are labelled — thin or small stocks are riskier. Source: ${esc(UNI.source)} bhavcopy.</p>
+  <input id="q" placeholder="Search ${UNI.total} stocks by name or symbol…" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:inherit;margin-bottom:6px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <label class="muted" style="font-size:13px"><input type="checkbox" id="onlyElig"> Eligible only</label>
+    <label class="muted" style="font-size:13px"><input type="checkbox" id="noSme" checked> Hide SME</label>
+  </div>
+  <div id="results"></div>`;
+}
+function wireSearch() {
+  const q = $("#q"), res = $("#results"), onlyElig = $("#onlyElig"), noSme = $("#noSme");
+  const render = () => {
+    const term = (q.value || "").trim().toLowerCase();
+    let rows = UNI.symbols;
+    if (noSme.checked) rows = rows.filter(r => r.board !== "SME");
+    if (onlyElig.checked) rows = rows.filter(r => r.eligible);
+    if (term) rows = rows.filter(r => r.symbol.toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term));
+    const show = rows.slice(0, 200);
+    res.innerHTML = `<div class="muted" style="font-size:12px;margin-bottom:6px">${rows.length} match${rows.length === 1 ? "" : "es"}${rows.length > 200 ? " — showing first 200" : ""}</div>` +
+      `<div class="scroll"><table><thead><tr><th>Symbol</th><th>Name</th><th class="n">Close ₹</th><th class="n">Day</th><th class="n">20d ₹cr</th><th>Status</th><th>Links</th></tr></thead><tbody>` +
+      show.map(r => `<tr><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name)}</td><td class="n">${r.close == null ? "–" : num(r.close)}</td>
+        <td class="n">${pct(r.day_change)}</td><td class="n">${num(r.med_turnover_cr, 1)}</td>
+        <td>${r.eligible ? '<span class="chip BUY">Eligible</span>' : `<span class="chip HOLD" title="${esc(r.reason)}">${esc(r.board === "SME" ? "SME" : "Not eligible")}</span>`}</td>
+        <td style="font-size:12px"><a href="${esc(r.tickertape)}" target="_blank" rel="noopener">TT</a> · <a href="${esc(r.screener)}" target="_blank" rel="noopener">Scr</a> · <a href="${esc(r.moneycontrol)}" target="_blank" rel="noopener">MC</a></td></tr>`).join("") +
+      `</tbody></table></div>`;
+    if (!rows.length) res.innerHTML = `<div class="muted">No matches.</div>`;
+  };
+  q.oninput = render; onlyElig.onchange = render; noSme.onchange = render;
+  render();
 }
 
 function today() {

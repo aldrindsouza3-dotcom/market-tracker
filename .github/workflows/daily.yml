@@ -17,6 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
+      - name: Restore market-data cache (bhavcopies, history)
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: mktcache-${{ github.run_id }}
+          restore-keys: mktcache-
       - run: pip install -r requirements.txt
       - name: Run pipeline
         env:

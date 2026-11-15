@@ -194,6 +194,7 @@ def main():
            "ipos": ipos, "news": news, "data_gaps": gaps, "disclaimer": DISCLAIMER}
     (OUT / "latest.json").write_text(json.dumps(clean(out), indent=1), encoding="utf-8")
 
+    build_full_universe(now)  # whole-market searchable index + liquidity gate (safe, isolated)
     append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec)
     update_track_record(now, top5, px)
 
@@ -210,6 +211,30 @@ def main():
         lines.append(DISCLAIMER)
         sent = N.send_all(f"Top 5 picks - {now:%d %b}", "\n".join(lines), SITE_URL or None)
         print("Notified via:", sent or "nothing (no channel configured)")
+
+
+def build_full_universe(now):
+    """Publish site/data/universe.json: every NSE equity, searchable, with the liquidity gate + reason.
+    Fully isolated — any failure here must not stop the main run."""
+    try:
+        import nse
+        s = nse.session()
+        recent = nse.recent_bhavcopies(22, s)
+        if not recent:
+            print("  ! universe: no bhavcopy available (NSE/BSE unreachable); keeping previous")
+            return
+        asof = recent[0][0]
+        sec = nse.securities(s)
+        uni = nse.build_universe(recent, sec)
+        elig = [u for u in uni if u["eligible"]]
+        payload = {"generated_at": now.isoformat(), "asof": asof.isoformat(), "source": recent[0][1]["source"].iloc[0],
+                   "total": len(uni), "eligible": len(elig), "sme": sum(1 for u in uni if u["board"] == "SME"),
+                   "gate": "Median 20-day turnover >= Rs 5 cr, price >= Rs 10, mainboard, not SME/surveillance",
+                   "symbols": uni}
+        (OUT / "universe.json").write_text(json.dumps(clean(payload), indent=0), encoding="utf-8")
+        print(f"  universe: {len(uni)} symbols ({len(elig)} eligible) as of {asof}")
+    except Exception as ex:
+        print("  ! universe build failed (non-fatal):", str(ex)[:160])
 
 
 def append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec):
