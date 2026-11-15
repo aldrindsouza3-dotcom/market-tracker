@@ -200,6 +200,11 @@ def main():
         build_stocks.build(now)   # dual Trading/Investing scoring + per-symbol detail + chart reading
     except Exception as _ex:
         print("  ! dual-mode build skipped:", str(_ex)[:140])
+    try:
+        import backtest
+        backtest.run(now)         # weekly-cached backtest of the Trading rule vs Nifty
+    except Exception as _ex:
+        print("  ! backtest skipped:", str(_ex)[:140])
     append_history(now, regime, breadth, nifty, indices, commodities, currencies, adv, dec)
     update_track_record(now, top5, px)
 
@@ -232,10 +237,23 @@ def build_full_universe(now):
         sec = nse.securities(s)
         uni = nse.build_universe(recent, sec)
         elig = [u for u in uni if u["eligible"]]
+        # data-quality health check
+        stale_days = (now.date() - asof).days
+        absurd = [u["symbol"] for u in uni if u["day_change"] is not None and abs(u["day_change"]) > 0.35]
+        missing_close = sum(1 for u in uni if u["close"] is None)
+        issues = []
+        if stale_days > 4:
+            issues.append(f"Data is {stale_days} days old")
+        if len(absurd) > 30:
+            issues.append(f"{len(absurd)} stocks moved >35% (possible unadjusted corporate actions)")
+        if missing_close > 50:
+            issues.append(f"{missing_close} symbols missing close")
+        health = {"status": "ok" if not issues else "warn", "asof": asof.isoformat(),
+                  "stale_days": stale_days, "absurd_moves": len(absurd), "issues": issues}
         payload = {"generated_at": now.isoformat(), "asof": asof.isoformat(), "source": recent[0][1]["source"].iloc[0],
                    "total": len(uni), "eligible": len(elig), "sme": sum(1 for u in uni if u["board"] == "SME"),
                    "gate": "Median 20-day turnover >= Rs 5 cr, price >= Rs 10, mainboard, not SME/surveillance",
-                   "symbols": uni}
+                   "health": health, "symbols": uni}
         (OUT / "universe.json").write_text(json.dumps(clean(payload), indent=0), encoding="utf-8")
         print(f"  universe: {len(uni)} symbols ({len(elig)} eligible) as of {asof}")
     except Exception as ex:

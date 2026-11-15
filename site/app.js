@@ -6,7 +6,7 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, BT = null, tab = "today";
 const sortState = {};
 const LS = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const watch = () => LS.get("watchlist") || [];
@@ -14,7 +14,7 @@ const inWatch = s => watch().includes(s);
 const toggleWatch = s => { const w = watch(); const i = w.indexOf(s); i >= 0 ? w.splice(i, 1) : w.push(s); LS.set("watchlist", w); };
 
 const TABS = [["today", "Today"], ["trading", "Trading"], ["investing", "Investing"], ["overview", "Overview"], ["search", "All stocks"], ["watchlist", "Watchlist"], ["stocks", "India stocks"], ["funds", "Mutual funds"], ["metals", "Gold, silver & commodities"],
-["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["news", "News"], ["how", "How it works"]];
+["fx", "Currency & bonds"], ["global", "Global markets"], ["ipo", "IPOs"], ["track", "Track record"], ["backtest", "Backtest"], ["news", "News"], ["how", "How it works"]];
 const BOTTOM = [["today", "Today", "★"], ["trading", "Trading", "⚡"], ["investing", "Investing", "◈"], ["markets", "Markets", "🌐"], ["more", "More", "☰"]];
 const SECTIONS = { markets: "metals", more: "search" };  // bottom-nav groups map to a starting tab
 
@@ -27,11 +27,14 @@ async function load() {
     try { UNI = await (await fetch("data/universe.json?" + t)).json(); } catch { UNI = null; }
     try { MODES = await (await fetch("data/modes.json?" + t)).json(); } catch { MODES = null; }
     try { IDX = await (await fetch("data/stocks_index.json?" + t)).json(); } catch { IDX = null; }
+    try { BT = await (await fetch("data/backtest.json?" + t)).json(); } catch { BT = null; }
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn">No data yet. Run <code>python pipeline/run_daily.py</code> once, then reload.</div>`; return;
   }
   const g = new Date(D.generated_at);
-  $("#stamp").textContent = "Updated " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day data";
+  const h = UNI && UNI.health;
+  const badge = h ? `<span class="chip ${h.status === "ok" ? "BUY" : "HOLD"}" title="${esc((h.issues || []).join("; ") || "Data checks passed")}">${h.status === "ok" ? "✓ data ok" : "⚠ data"}</span> ` : "";
+  $("#stamp").innerHTML = badge + "Updated " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day data";
   $("#foot").innerHTML = esc(D.disclaimer) + " Data: Yahoo Finance, AMFI via mfapi.in. May be delayed or incomplete.";
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("");
   $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) go(b.dataset.t); };
@@ -41,7 +44,7 @@ async function load() {
 }
 function go(t) { tab = t; history.replaceState(null, "", "#" + tab); window.scrollTo(0, 0); load2(); }
 function load2() {
-  const VIEWS = { today, trading, investing, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, news, how };
+  const VIEWS = { today, trading, investing, overview, search, watchlist, stocks, funds, metals, fx, global, ipo, track, backtest, news, how };
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
   const botActive = Object.keys(SECTIONS).find(k => SECTIONS[k] === tab) || tab;
   document.querySelectorAll("#bottomnav button").forEach(b => b.classList.toggle("on", b.dataset.t === botActive));
@@ -356,6 +359,20 @@ function wireSearch() {
   };
   q.oninput = render; onlyElig.onchange = render; noSme.onchange = render;
   render();
+}
+
+function backtest() {
+  if (!BT) return `<h2>Backtest</h2><div class="card muted">The backtest runs weekly and appears once enough history has been collected.</div>`;
+  const beats = BT.verdict && BT.verdict.includes("beats");
+  const kpi = (l, v) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`;
+  return `<h2>Backtest of the Trading rule</h2>
+    <div class="card ${beats ? "" : "warn"}"><b>${esc(BT.verdict || "Result")}</b>
+      <div class="muted" style="font-size:13px;margin-top:4px">${esc(BT.method)}</div></div>
+    <div class="kpis">
+      ${kpi("Trades", BT.trades)}${kpi("Symbols", BT.symbols_tested)}${kpi("Win rate", Math.round(BT.win_rate * 100) + "%")}
+      ${kpi("Expectancy / trade", BT.expectancy_pct + "%")}${kpi("Avg win", BT.avg_win_pct + "%")}${kpi("Avg loss", BT.avg_loss_pct + "%")}
+      ${kpi("Profit factor", BT.profit_factor ?? "–")}${kpi("Rule total return", BT.total_return_pct + "%")}${kpi("Nifty 3y", BT.nifty_3y_return_pct != null ? BT.nifty_3y_return_pct + "%" : "–")}</div>
+    <p class="muted">Costs assumed: ${BT.cost_assumption_pct}% round-trip (brokerage + slippage). "Rule total return" compounds trades sequentially (a simplification — real trades overlap across stocks), so read <b>expectancy per trade</b> and <b>win rate</b> as the honest headline. If the rule doesn't beat the index, the app says so — don't trust a signal the history doesn't support.</p>`;
 }
 
 function today() {
