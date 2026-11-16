@@ -55,6 +55,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-notify", action="store_true")
     ap.add_argument("--fast", action="store_true", help="skip fundamentals and mutual funds (testing)")
+    ap.add_argument("--force-notify", action="store_true", help="send even if this slot was already sent today")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=5, minutes=30)))
@@ -221,7 +222,7 @@ def main():
     for t in top5:
         print(f"  {t['kind']:12} {t['name']:38} score {t['score']:5.1f}  {t['signal']}")
     if not args.no_notify:
-        send_daily_notification(now, regime, breadth, modes, top5, brief, funds)
+        send_daily_notification(now, regime, breadth, modes, top5, brief, funds, args.force_notify)
 
 
 def build_ai_brief(now, regime, breadth, overview, modes):
@@ -251,10 +252,21 @@ def build_ai_brief(now, regime, breadth, overview, modes):
         return None
 
 
-def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None):
+def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None, force=False):
     """Two daily pushes for the Indian market: a morning 'market open' alert and an evening
-    'market closed' update, each with Indian stock shortlists (trading + investing) + top mutual funds."""
-    is_open = now.hour < 12  # morning run ~09:15 IST = market open; evening ~17:00 = market closed
+    'market closed' update, each with Indian stock shortlists (trading + investing) + top mutual funds.
+    Sends each slot (morning/evening) at most once per day, so redundant cron fires don't spam."""
+    is_open = now.hour < 12  # morning run before noon IST = market open; afternoon/evening = market closed
+    slot = "morning" if is_open else "evening"
+    today = now.strftime("%Y-%m-%d")
+    state_f = OUT / "notify_state.json"
+    try:
+        state = json.loads(state_f.read_text(encoding="utf-8"))
+    except Exception:
+        state = {}
+    if not force and state.get("date") == today and slot in state.get("slots", []):
+        print(f"Notification for {slot} already sent today ({today}); skipping to avoid duplicates.")
+        return
     when = "Market OPEN" if is_open else "Market CLOSED"
     title = f"{when} - {now:%d %b}"
     head = f"{when} · {regime}" + (f" · {breadth:.0%} of Indian stocks above their 200-day avg" if breadth is not None else "")
@@ -295,6 +307,15 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None
     html = _email_html(now, is_open, when, regime, breadth, brief, tt, it, tf, treasons, ireasons)
     sent = N.send_all(title, "\n".join(lines), SITE_URL or None, html=html)
     print("Notified via:", sent or "nothing (no channel configured)")
+    if sent:  # record this slot so later cron fires today don't resend
+        if state.get("date") != today:
+            state = {"date": today, "slots": []}
+        if slot not in state["slots"]:
+            state["slots"].append(slot)
+        try:
+            state_f.write_text(json.dumps(state), encoding="utf-8")
+        except Exception:
+            pass
 
 
 def _email_html(now, is_open, when, regime, breadth, brief, tt, it, tf, treasons, ireasons):
