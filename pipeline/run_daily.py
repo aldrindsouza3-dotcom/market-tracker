@@ -292,8 +292,80 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None
         for i, t in enumerate(top5, 1):
             lines.append(f"{i}. {t['name']} [{t['kind']}] {t['signal']}")
     lines.append(""); lines.append(DISCLAIMER)
-    sent = N.send_all(title, "\n".join(lines), SITE_URL or None)
+    html = _email_html(now, is_open, when, regime, breadth, brief, tt, it, tf, treasons, ireasons)
+    sent = N.send_all(title, "\n".join(lines), SITE_URL or None, html=html)
     print("Notified via:", sent or "nothing (no channel configured)")
+
+
+def _email_html(now, is_open, when, regime, breadth, brief, tt, it, tf, treasons, ireasons):
+    """A clean, mobile-friendly HTML email (inline styles for email-client compatibility)."""
+    accent = "#0f766e"
+    hero = "#065f46" if is_open else "#1e3a5f"
+    regime_col = {"RISK-ON": "#16a34a", "RISK-OFF": "#dc2626"}.get(regime, "#d97706")
+    url = SITE_URL or "https://aldrindsouza3-dotcom.github.io/market-tracker/"
+
+    def chip(text, col):
+        return f'<span style="background:{col};color:#fff;font-size:12px;font-weight:700;padding:2px 9px;border-radius:10px;white-space:nowrap">{text}</span>'
+
+    def stock_row(r, reasons, is_trade):
+        why = reasons.get(r["symbol"]) or (r.get("trading_verdict_txt") if is_trade else r.get("investing_verdict_txt")) or ""
+        buy = r.get("trading_buy_upto")
+        buy_html = f'<div style="font-size:13px;color:{accent};font-weight:700;margin-top:2px">Good to buy up to ₹{buy:,.0f}</div>' if buy else ""
+        return (f'<tr><td style="padding:12px 14px;border-bottom:1px solid #eef2f6">'
+                f'<div style="font-weight:700;color:#14181f;font-size:15px">{r["name"]}</div>'
+                f'{buy_html}'
+                f'<div style="font-size:13px;color:#667085;margin-top:3px">{why}</div></td></tr>')
+
+    def section(title, emoji, rows_html, note):
+        if not rows_html:
+            return ""
+        return (f'<tr><td style="padding:18px 0 6px"><div style="font-size:16px;font-weight:800;color:#14181f">{emoji} {title}</div>'
+                f'<div style="font-size:12px;color:#98a2b3;margin-bottom:6px">{note}</div>'
+                f'<table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #eef2f6;border-radius:10px;overflow:hidden">{rows_html}</table></td></tr>')
+
+    trade_rows = "".join(stock_row(r, treasons, True) for r in tt[:5])
+    invest_rows = "".join(stock_row(r, ireasons, False) for r in it[:5])
+    fund_rows = ""
+    for f in tf:
+        cagr = (f.get("cagr_3y") or f.get("ret_1y") or 0) * 100
+        fund_rows += (f'<tr><td style="padding:12px 14px;border-bottom:1px solid #eef2f6">'
+                      f'<div style="font-weight:700;color:#14181f;font-size:15px">{f["name"].split(" - ")[0]}</div>'
+                      f'<div style="font-size:13px;color:#16a34a;font-weight:700;margin-top:2px">3-year return: {cagr:.0f}% per year</div></td></tr>')
+
+    brief_html = ""
+    if brief and brief.get("brief"):
+        brief_html = (f'<tr><td style="padding:4px 0 2px"><div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:10px;padding:12px 14px">'
+                      f'<div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:{accent};text-transform:uppercase">✨ Market overview</div>'
+                      f'<div style="font-size:14px;color:#14181f;margin-top:4px;line-height:1.5">{brief["brief"]}</div></div></td></tr>')
+
+    breadth_txt = f"{breadth:.0%} of Indian stocks are above their 200-day average" if breadth is not None else ""
+    good_news = ("Plenty of stocks are trending up — a good backdrop for buyers." if (breadth or 0) > 0.55
+                 else "Be selective today — fewer stocks are trending up." if (breadth or 0) < 0.45
+                 else "A mixed market — stick to the strongest names below.")
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f6f7f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;padding:16px 0"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+  <tr><td style="background:{hero};border-radius:14px 14px 0 0;padding:22px 20px">
+    <div style="color:#fff;font-size:22px;font-weight:800">📈 Market Tracker</div>
+    <div style="margin-top:8px">{chip(when, 'rgba(255,255,255,.22)')} &nbsp; {chip('Market: ' + regime, regime_col)}</div>
+    <div style="color:#d1fae5;font-size:13px;margin-top:10px">{now:%A, %d %B %Y} · {breadth_txt}</div>
+    <div style="color:#fff;font-size:14px;margin-top:4px;font-weight:600">{good_news}</div>
+  </td></tr>
+  <tr><td style="background:#fff;padding:14px 18px 20px;border-radius:0 0 0 0">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      {brief_html}
+      {section('Trading shortlist', '⚡', trade_rows, 'Short-term swing ideas (days to weeks) with buy-up-to prices')}
+      {section('Investing shortlist', '◈', invest_rows, 'Long-term quality picks (months to years)')}
+      {section('Mutual funds', '💰', fund_rows, 'For SIP / accumulation')}
+    </table>
+    <div style="text-align:center;margin-top:22px">
+      <a href="{url}" style="background:{accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 26px;border-radius:10px;display:inline-block">Open the full dashboard →</a>
+    </div>
+    <div style="font-size:11px;color:#98a2b3;margin-top:18px;line-height:1.5;border-top:1px solid #eef2f6;padding-top:12px">
+      Research aid, not investment advice — the author is not a SEBI-registered adviser. End-of-day data; verify before investing. Prices are in ₹ (INR).
+    </div>
+  </td></tr>
+</table></td></tr></table></body></html>"""
 
 
 def build_full_universe(now):

@@ -75,7 +75,7 @@ def _web_push(title, body, url, sent):
         sent.append(f"app-push x{ok}")
 
 
-def send_all(title: str, body: str, url: str | None = None) -> list[str]:
+def send_all(title: str, body: str, url: str | None = None, html: str | None = None) -> list[str]:
     sent = []
     e = os.environ.get
     _web_push(title, body, url, sent)
@@ -120,6 +120,8 @@ def send_all(title: str, body: str, url: str | None = None) -> list[str]:
             m = EmailMessage()
             m["Subject"], m["From"], m["To"] = title, e("SMTP_USER"), e("MAIL_TO") or e("SMTP_USER")
             m.set_content(body + (f"\n\n{url}" if url else ""))
+            if html:
+                m.add_alternative(html, subtype="html")
             with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
                 s.login(e("SMTP_USER"), e("SMTP_PASS"))
                 s.send_message(m)
