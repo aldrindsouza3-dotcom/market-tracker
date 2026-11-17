@@ -6,7 +6,8 @@ const num = (x, d = 2) => x == null ? "–" : Number(x).toLocaleString("en-IN", 
 const cls = s => /^BUY|ACCUM|SIP/.test(s) ? "BUY" : /SELL/.test(s) ? "SELL" : "HOLD";
 const chip = s => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
 const bar = v => `<span class="bar-s" style="width:${Math.max(2, v * 0.6)}px"></span>${v.toFixed(0)}`;
-let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, USIDX = null, BT = null, BRIEF = null, tab = "today";
+let D = null, TR = null, HIST = [], UNI = null, MODES = null, IDX = null, USIDX = null, BT = null, BRIEF = null, LIVE = null, tab = "today";
+const RAW_LIVE = "https://raw.githubusercontent.com/aldrindsouza3-dotcom/market-tracker/main/site/data/live.json";
 const sortState = {};
 const LS = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const watch = () => LS.get("watchlist") || [];
@@ -46,6 +47,7 @@ async function load() {
     try { BT = await fetchJSON("data/backtest.json"); } catch { BT = null; }
     try { BRIEF = await fetchJSON("data/brief.json"); } catch { BRIEF = null; }
     try { USIDX = await fetchJSON("data/us_index.json"); } catch { USIDX = null; }
+    await refreshLive();
   } catch (e) {
     $("#view").innerHTML = `<div class="card warn"><b>Couldn't load data.</b><br><span class="muted">${esc(e.message)}. Check your connection, or reset the app if it stays blank.</span>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -539,6 +541,31 @@ function applyPreset(name) { const f = SCREENER_PRESETS[name]; LS.set("screener"
 function clearScreener() { LS.set("screener", {}); load2(); }
 function wireScreener() { const f = LS.get("screener"); if (f && Object.keys(f).length) runScreener(f); }
 
+// ---------- Near-live prices (from the raw GitHub URL, updated ~every 30 min during market hours) ----------
+async function refreshLive() {
+  try { LIVE = await (await fetch(RAW_LIVE + "?t=" + Date.now(), { cache: "no-store" })).json(); }
+  catch { try { LIVE = await fetchJSON("data/live.json"); } catch { LIVE = null; } }
+}
+function liveCard() {
+  if (!LIVE) return "";
+  const u = new Date(LIVE.updated_at);
+  const mins = Math.round((Date.now() - u.getTime()) / 60000);
+  const ago = mins < 1 ? "just now" : mins < 60 ? mins + " min ago" : Math.round(mins / 60) + "h ago";
+  const status = LIVE.market_open ? `<span class="chip BUY">● Market open</span>` : `<span class="chip HOLD">Market closed</span>`;
+  const q = x => `<div style="min-width:96px"><div class="muted" style="font-size:12px">${esc(x.name)}</div><div style="font-weight:700">${num(x.price, x.price > 500 ? 0 : 2)} <span style="font-size:12px">${pct(x.change)}</span></div></div>`;
+  const idx = (LIVE.indices || []).filter(i => ["Nifty 50", "Sensex", "Bank Nifty"].includes(i.name));
+  const extra = (LIVE.commodities || []).concat(LIVE.fx || []);
+  const picks = (LIVE.picks || []).slice(0, 5);
+  return `<div class="card" style="border-left:4px solid var(--accent)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <b>📡 Near-live prices</b> ${status}
+      <span class="muted" style="font-size:12px">updated ${ago} · ${esc(LIVE.delay_note)}</span></div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px">${idx.map(q).join("")}${extra.map(q).join("")}</div>
+    ${picks.length ? `<div class="muted" style="font-size:12px;margin:12px 0 4px">Your picks right now:</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">${picks.map(p => `<div style="min-width:120px"><div style="font-weight:600;font-size:13px">${esc(p.symbol)}</div><div>${num(p.price)} <span style="font-size:12px">${pct(p.change)}</span></div>${p.buy_upto ? `<div class="muted" style="font-size:11px">buy ≤ ₹${num(p.buy_upto, 0)}</div>` : ""}</div>`).join("")}</div>` : ""}
+    <div class="muted" style="font-size:11px;margin-top:8px">Prices refresh about every 30 min during market hours. The analysis & picks update once daily after close.</div></div>`;
+}
+
 function backtest() {
   if (!BT) return `<h2>Backtest</h2><div class="card muted">The backtest runs weekly and appears once enough history has been collected.</div>`;
   const beats = BT.verdict && BT.verdict.includes("beats");
@@ -566,7 +593,7 @@ function today() {
     ${tt.slice(0, 3).map(x => modeCard(x, "trading")).join("")}<p class="muted"><a href="#" onclick="go('trading');return false">See all trading →</a></p>
     <h2>◈ Investing shortlist</h2><div class="muted" style="font-size:13px;margin:-6px 0 6px">Long-term ideas — quality & valuation first.</div>
     ${it.slice(0, 3).map(x => modeCard(x, "investing")).join("")}<p class="muted"><a href="#" onclick="go('investing');return false">See all investing →</a></p>` : "";
-  return `${aiCard}<div class="card"><div class="muted">Market regime</div><div class="regime ${col}">${r}</div>
+  return `${liveCard()}${aiCard}<div class="card"><div class="muted">Market regime</div><div class="regime ${col}">${r}</div>
     <div class="muted">${D.breadth_above_200dma != null ? Math.round(D.breadth_above_200dma * 100) + "% of the tracked Indian stocks above their 200-day average. " : ""}
     ${r === "RISK-OFF" ? "Be defensive: fewer new buys, smaller sizes." : r === "RISK-ON" ? "Trend and breadth support buying on dips." : "Mixed signals: be selective and stagger entries."}</div>
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:10px">${q(nifty)}${q(sensex)}${q(gold)}${q(silver)}${q(usd)}</div></div>
@@ -702,6 +729,8 @@ const how = () => `<h2>How the picks are made</h2><div class="card"><ul>
 
 if (location.hash.slice(1) && TABS.some(t => t[0] === location.hash.slice(1))) tab = location.hash.slice(1);
 load();
+// refresh near-live prices every 3 minutes while the app is open and on the Today tab
+setInterval(async () => { if (tab === "today" && !document.hidden) { await refreshLive(); if (tab === "today") load2(); } }, 180000);
 
 // ================= In-app AI assistant (uses YOUR Anthropic key, stored on this device only) =================
 // Free, open-source-friendly AI providers (no card needed). Default = OpenRouter free Llama.
