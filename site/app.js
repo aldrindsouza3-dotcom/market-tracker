@@ -56,8 +56,13 @@ async function load() {
   }
   const g = new Date(D.generated_at);
   const h = UNI && UNI.health;
-  const badge = h ? `<span class="chip ${h.status === "ok" ? "BUY" : "HOLD"}" title="${esc((h.issues || []).join("; ") || "Data checks passed")}">${h.status === "ok" ? "✓ data ok" : "⚠ data"}</span> ` : "";
-  $("#stamp").innerHTML = badge + "Updated " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day data";
+  // how stale is the actual stock data (bhavcopy) vs the most recent weekday?
+  const asof = UNI && UNI.asof ? new Date(UNI.asof + "T12:00:00") : null;
+  let tradingStale = 0;
+  if (asof) { let dd = new Date(); dd.setHours(12, 0, 0, 0); while (dd > asof) { dd.setDate(dd.getDate() - 1); if (dd.getDay() !== 0 && dd.getDay() !== 6 && dd > asof) tradingStale++; } }
+  const stale = tradingStale >= 2;
+  const badge = `<span class="chip ${stale ? "SELL" : "BUY"}" title="${stale ? "Stock prices are from an older session — a data fetch was missed; it should refresh on the next run." : "Data is current"}">${stale ? "⚠ prices " + UNI.asof : "✓ prices to " + (UNI ? UNI.asof : "–")}</span> `;
+  $("#stamp").innerHTML = badge + "run " + g.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) + " · end-of-day (not live)";
   $("#foot").innerHTML = esc(D.disclaimer) + " Data: Yahoo Finance, AMFI via mfapi.in. May be delayed or incomplete. · <a href=\"#\" onclick=\"resetApp();return false\">Reset app</a> if it misbehaves.";
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="${k === tab ? "on" : ""}">${l}</button>`).join("");
   $("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) go(b.dataset.t); };

@@ -43,15 +43,20 @@ def session() -> requests.Session:
     return s
 
 
-def _get(s: requests.Session, url: str, referer: str, tries: int = 3, **kw) -> requests.Response | None:
+def _get(s: requests.Session, url: str, referer: str, tries: int = 6, **kw) -> requests.Response | None:
     for i in range(tries):
         try:
-            r = s.get(url, headers={"Referer": referer}, timeout=35, **kw)
+            r = s.get(url, headers={"Referer": referer}, timeout=40, **kw)
             if r.status_code == 200 and r.content:
                 return r
+            if r.status_code in (401, 403):  # NSE blocked this request — re-warm cookies and retry
+                try:
+                    s.get("https://www.nseindia.com/", timeout=20)
+                except Exception:
+                    pass
         except Exception:
             pass
-        time.sleep(1.5 * (i + 1))
+        time.sleep(2 * (i + 1))
     return None
 
 
