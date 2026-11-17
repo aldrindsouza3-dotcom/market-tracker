@@ -70,5 +70,17 @@
   "usdinr": 93.45999908447266,
   "advancers": 49,
   "decliners": 40
+ },
+ {
+  "date": "2026-11-18",
+  "regime": "MIXED",
+  "breadth": 0.596,
+  "nifty": 25291.099609375,
+  "sensex": 82104.7890625,
+  "gold": 3850.800048828125,
+  "silver": 47.209999084472656,
+  "usdinr": 93.45999908447266,
+  "advancers": 46,
+  "decliners": 43
  }
 ]

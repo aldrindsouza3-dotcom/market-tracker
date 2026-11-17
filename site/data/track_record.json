@@ -8,8 +8,8 @@
    "stop": 462.7,
    "target": 515.57,
    "status": "OPEN",
-   "last": 497.25,
-   "pnl_pct": 2.77
+   "last": 494.20001220703125,
+   "pnl_pct": 2.14
   },
   {
    "date": "2026-11-11",
@@ -19,8 +19,8 @@
    "stop": 1678.75,
    "target": 1926.88,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.9
+   "last": 1776.4000244140625,
+   "pnl_pct": -0.09
   },
   {
    "date": "2026-11-11",
@@ -30,8 +30,8 @@
    "stop": 10540.04,
    "target": 12283.68,
    "status": "OPEN",
-   "last": 11150.0,
-   "pnl_pct": -0.78
+   "last": 11080.0,
+   "pnl_pct": -1.4
   },
   {
    "date": "2026-11-11",
@@ -41,8 +41,8 @@
    "stop": 1818.52,
    "target": 2077.73,
    "status": "OPEN",
-   "last": 1917.0,
-   "pnl_pct": -0.27
+   "last": 1893.0,
+   "pnl_pct": -1.52
   },
   {
    "date": "2026-11-11",
@@ -52,8 +52,8 @@
    "stop": 1317.62,
    "target": 1518.31,
    "status": "OPEN",
-   "last": 1355.699951171875,
-   "pnl_pct": -3.02
+   "last": 1384.5999755859375,
+   "pnl_pct": -0.95
   },
   {
    "date": "2026-11-12",
@@ -63,8 +63,8 @@
    "stop": 1677.69,
    "target": 1918.46,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.68
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.14
   },
   {
    "date": "2026-11-12",
@@ -74,8 +74,8 @@
    "stop": 1897.82,
    "target": 2238.27,
    "status": "OPEN",
-   "last": 2041.0,
-   "pnl_pct": 0.34
+   "last": 2010.0,
+   "pnl_pct": -1.18
   },
   {
    "date": "2026-11-12",
@@ -85,8 +85,8 @@
    "stop": 1136.36,
    "target": 1360.46,
    "status": "OPEN",
-   "last": 1203.0999755859375,
-   "pnl_pct": -1.87
+   "last": 1192.800048828125,
+   "pnl_pct": -2.71
   },
   {
    "date": "2026-11-13",
@@ -96,8 +96,8 @@
    "stop": 1689.25,
    "target": 1937.38,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -1.48
+   "last": 1776.4000244140625,
+   "pnl_pct": -0.68
   },
   {
    "date": "2026-11-13",
@@ -107,8 +107,8 @@
    "stop": 1879.45,
    "target": 2224.58,
    "status": "OPEN",
-   "last": 2041.0,
-   "pnl_pct": 1.16
+   "last": 2010.0,
+   "pnl_pct": -0.37
   },
   {
    "date": "2026-11-13",
@@ -118,8 +118,8 @@
    "stop": 828.5,
    "target": 939.75,
    "status": "OPEN",
-   "last": 901.5499877929688,
-   "pnl_pct": 3.27
+   "last": 886.0,
+   "pnl_pct": 1.49
   },
   {
    "date": "2026-11-14",
@@ -129,8 +129,8 @@
    "stop": 1677.69,
    "target": 1918.46,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.68
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.14
   },
   {
    "date": "2026-11-14",
@@ -140,8 +140,8 @@
    "stop": 1897.82,
    "target": 2238.27,
    "status": "OPEN",
-   "last": 2041.0,
-   "pnl_pct": 0.34
+   "last": 2010.0,
+   "pnl_pct": -1.18
   },
   {
    "date": "2026-11-14",
@@ -151,8 +151,8 @@
    "stop": 1136.36,
    "target": 1360.46,
    "status": "OPEN",
-   "last": 1203.0999755859375,
-   "pnl_pct": -1.87
+   "last": 1192.800048828125,
+   "pnl_pct": -2.71
   },
   {
    "date": "2026-11-15",
@@ -162,8 +162,8 @@
    "stop": 1670.52,
    "target": 1904.23,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.11
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.7
   },
   {
    "date": "2026-11-15",
@@ -173,8 +173,8 @@
    "stop": 1894.56,
    "target": 2228.15,
    "status": "OPEN",
-   "last": 2041.0,
-   "pnl_pct": 0.64
+   "last": 2010.0,
+   "pnl_pct": -0.89
   },
   {
    "date": "2026-11-15",
@@ -184,8 +184,8 @@
    "stop": 468.11,
    "target": 519.21,
    "status": "OPEN",
-   "last": 497.25,
-   "pnl_pct": 1.78
+   "last": 494.20001220703125,
+   "pnl_pct": 1.16
   },
   {
    "date": "2026-11-16",
@@ -195,8 +195,8 @@
    "stop": 10305.35,
    "target": 12075.72,
    "status": "OPEN",
-   "last": 11150.0,
-   "pnl_pct": 1.24
+   "last": 11080.0,
+   "pnl_pct": 0.6
   },
   {
    "date": "2026-11-16",
@@ -206,8 +206,8 @@
    "stop": 1672.16,
    "target": 1902.5,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.13
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.69
   },
   {
    "date": "2026-11-16",
@@ -217,8 +217,8 @@
    "stop": 343.71,
    "target": 388.43,
    "status": "OPEN",
-   "last": 365.79998779296875,
-   "pnl_pct": 1.16
+   "last": 362.0,
+   "pnl_pct": 0.11
   },
   {
    "date": "2026-11-17",
@@ -228,8 +228,8 @@
    "stop": 1670.52,
    "target": 1904.23,
    "status": "OPEN",
-   "last": 1762.0,
-   "pnl_pct": -0.11
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.7
   },
   {
    "date": "2026-11-17",
@@ -239,8 +239,8 @@
    "stop": 1894.56,
    "target": 2228.15,
    "status": "OPEN",
-   "last": 2041.0,
-   "pnl_pct": 0.64
+   "last": 2010.0,
+   "pnl_pct": -0.89
   },
   {
    "date": "2026-11-17",
@@ -250,13 +250,46 @@
    "stop": 468.11,
    "target": 519.21,
    "status": "OPEN",
-   "last": 497.25,
-   "pnl_pct": 1.78
+   "last": 494.20001220703125,
+   "pnl_pct": 1.16
+  },
+  {
+   "date": "2026-11-18",
+   "symbol": "TECHM.NS",
+   "name": "Tech Mahindra",
+   "entry": 1776.4000244140625,
+   "stop": 1684.26,
+   "target": 1914.6,
+   "status": "OPEN",
+   "last": 1776.4000244140625,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-18",
+   "symbol": "DIVISLAB.NS",
+   "name": "Divi's Labs",
+   "entry": 11080.0,
+   "stop": 10371.85,
+   "target": 12142.22,
+   "status": "OPEN",
+   "last": 11080.0,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-18",
+   "symbol": "FEDERALBNK.NS",
+   "name": "Federal Bank",
+   "entry": 362.0,
+   "stop": 344.11,
+   "target": 388.83,
+   "status": "OPEN",
+   "last": 362.0,
+   "pnl_pct": 0.0
   }
  ],
  "summary": {
-  "total": 23,
-  "open": 23,
+  "total": 26,
+  "open": 26,
   "hit_rate": null
  }
 }
