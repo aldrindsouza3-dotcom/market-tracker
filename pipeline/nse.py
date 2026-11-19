@@ -176,7 +176,7 @@ def bhavcopy(d: dt.date, s: requests.Session | None = None, with_delivery: bool 
 def latest_bhavcopy(s: requests.Session | None = None, back: int = 7):
     """Most recent available trading day's bhavcopy. Returns (date, df) or (None, None)."""
     s = s or session()
-    for i in range(1, back + 1):
+    for i in range(0, back + 1):  # start at 0 so TODAY's close is used once NSE publishes it (after ~6 PM IST)
         d = dt.date.today() - dt.timedelta(days=i)
         if d.weekday() >= 5:
             continue
@@ -191,7 +191,7 @@ def recent_bhavcopies(n_days: int, s: requests.Session | None = None, scan: int 
     s = s or session()
     scan = scan or (n_days * 2 + 10)
     out = []
-    for i in range(1, scan):
+    for i in range(0, scan):  # include TODAY so an evening run uses today's close once NSE publishes it
         if len(out) >= n_days:
             break
         d = dt.date.today() - dt.timedelta(days=i)

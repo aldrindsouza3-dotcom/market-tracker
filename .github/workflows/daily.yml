@@ -7,10 +7,11 @@ on:
     - cron: "30 5 * * 1-5"    # 11:00 IST
     - cron: "55 5 * * 1-5"    # 11:25 IST (backup)
     - cron: "20 6 * * 1-5"    # 11:50 IST (backup)
-    # Evening "market closed" push after the 3:30 PM close
-    - cron: "0 12 * * 1-5"    # 17:30 IST
-    - cron: "30 12 * * 1-5"   # 18:00 IST (backup)
-    - cron: "0 13 * * 1-5"    # 18:30 IST (backup)
+    # Evening "market closed" push ~7-8 PM IST, after NSE publishes TODAY's official close (~6:30-7 PM).
+    # The job won't send until today's close data is in, so these later times avoid a stale past-day send.
+    - cron: "30 13 * * 1-5"   # 19:00 IST
+    - cron: "0 14 * * 1-5"    # 19:30 IST (backup)
+    - cron: "30 14 * * 1-5"   # 20:00 IST (backup)
   workflow_dispatch:
     inputs:
       force:

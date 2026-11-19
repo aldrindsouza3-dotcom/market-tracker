@@ -267,6 +267,13 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None
     if not force and not (window[0] <= mins <= window[1]):
         print(f"Outside {slot} delivery window ({now:%H:%M} IST); skipping notification.")
         return
+    # Evening = "today's close" update: only send once NSE has published TODAY's data, so the picks are
+    # never a stale past day. If today's close isn't in yet, skip and let a later backup run deliver it.
+    data_date = (modes or {}).get("asof")
+    if slot == "evening" and not force and data_date != today:
+        print(f"Evening update: today's close ({today}) not available yet (data as of {data_date}); "
+              f"skipping, a later run will send it.")
+        return
     state_f = OUT / "notify_state.json"
     try:
         state = json.loads(state_f.read_text(encoding="utf-8"))
@@ -279,6 +286,14 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None
     title = f"{when} - {now:%d %b}"
     head = f"{when} · {regime}" + (f" · {breadth:.0%} of Indian stocks above their 200-day avg" if breadth is not None else "")
     lines = [head]
+    # Always state which trading day's close the picks are built from (morning uses the prior close;
+    # evening uses today's). Keeps it clear the shortlist is current, not a past day.
+    if data_date:
+        try:
+            dd = dt.datetime.strptime(data_date, "%Y-%m-%d").strftime("%d %b %Y")
+        except Exception:
+            dd = data_date
+        lines.append(f"Based on NSE close of {dd}.")
     if is_open:
         lines.append("Today's shortlist for Indian stocks & funds:")
     else:
