@@ -9,7 +9,12 @@ on:
     - cron: "30 11 * * 1-5"   # 17:00 IST
     - cron: "0 12 * * 1-5"    # 17:30 IST (backup)
     - cron: "30 12 * * 1-5"   # 18:00 IST (backup)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Send notification even if this slot was already sent today (test)"
+        type: boolean
+        default: false
 permissions:
   contents: write
   pages: write
@@ -55,7 +60,7 @@ jobs:
           WA_TO: ${{ secrets.WA_TO }}
           WA_TEMPLATE: ${{ secrets.WA_TEMPLATE }}
           # Email disabled on purpose (was filling the Sent folder). To re-enable, add SMTP_* back here.
-        run: python pipeline/run_daily.py
+        run: python pipeline/run_daily.py ${{ inputs.force && '--force-notify' || '' }}
       - name: Commit data (keeps track record between runs)
         run: |
           git config user.name "market-bot"; git config user.email "bot@users.noreply.github.com"
