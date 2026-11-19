@@ -105,10 +105,15 @@ def send_all(title: str, body: str, url: str | None = None, html: str | None = N
             # Green API: links your own WhatsApp (QR). Sends to your own number -> "Message Yourself" chat.
             base = (e("GREENAPI_URL") or "https://api.green-api.com").rstrip("/")
             inst, tok = e("GREENAPI_ID_INSTANCE"), e("GREENAPI_TOKEN")
-            phone = "".join(ch for ch in e("GREENAPI_PHONE") if ch.isdigit())  # digits only, with country code
+            # Target: a specific chat (e.g. a "Market Tracker" group, ...@g.us) if GREENAPI_CHAT_ID is set,
+            # otherwise your own number's self-chat.
+            chat_id = (e("GREENAPI_CHAT_ID") or "").strip()
+            if not chat_id:
+                phone = "".join(ch for ch in e("GREENAPI_PHONE") if ch.isdigit())  # digits only, country code
+                chat_id = f"{phone}@c.us"
             text = f"*{title}*\n\n{body}" + (f"\n\n{url}" if url else "")
             r = requests.post(f"{base}/waInstance{inst}/sendMessage/{tok}", timeout=30,
-                              json={"chatId": f"{phone}@c.us", "message": text[:4000]})
+                              json={"chatId": chat_id, "message": text[:4000]})
             if r.status_code == 200 and "idMessage" in (r.text or ""):
                 sent.append("whatsapp")
             else:
