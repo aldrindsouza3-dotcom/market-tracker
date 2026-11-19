@@ -3,7 +3,8 @@
 App push (own PWA, no app):  VAPID_PRIVATE_KEY + VAPID_SUBJECT + PUSH_SUBS (JSON sub, or list of them)
 Phone push (easiest, free):  NTFY_TOPIC            -> install the ntfy app, subscribe to your secret topic
 Telegram:                    TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
-WhatsApp (easiest, free):    WHATSAPP_PHONE + WHATSAPP_APIKEY   (CallMeBot -- messages go to your own WhatsApp)
+WhatsApp (Green API, free):  GREENAPI_ID_INSTANCE + GREENAPI_TOKEN + GREENAPI_PHONE (+ optional GREENAPI_URL)
+WhatsApp (CallMeBot, free):  WHATSAPP_PHONE + WHATSAPP_APIKEY   (messages go to your own WhatsApp)
 WhatsApp (Meta Cloud API):   WA_TOKEN + WA_PHONE_ID + WA_TO (+ optional WA_TEMPLATE)
 Email:                       SMTP_USER + SMTP_PASS (+ MAIL_TO)  (Gmail app password)
 """
@@ -99,6 +100,21 @@ def send_all(title: str, body: str, url: str | None = None, html: str | None = N
             sent.append("telegram")
         except Exception as ex:
             print("  ! telegram failed:", ex)
+    if e("GREENAPI_ID_INSTANCE") and e("GREENAPI_TOKEN") and e("GREENAPI_PHONE"):
+        try:
+            # Green API: links your own WhatsApp (QR). Sends to your own number -> "Message Yourself" chat.
+            base = (e("GREENAPI_URL") or "https://api.green-api.com").rstrip("/")
+            inst, tok = e("GREENAPI_ID_INSTANCE"), e("GREENAPI_TOKEN")
+            phone = "".join(ch for ch in e("GREENAPI_PHONE") if ch.isdigit())  # digits only, with country code
+            text = f"*{title}*\n\n{body}" + (f"\n\n{url}" if url else "")
+            r = requests.post(f"{base}/waInstance{inst}/sendMessage/{tok}", timeout=30,
+                              json={"chatId": f"{phone}@c.us", "message": text[:4000]})
+            if r.status_code == 200 and "idMessage" in (r.text or ""):
+                sent.append("whatsapp")
+            else:
+                print("  ! whatsapp (green-api) failed:", r.status_code, (r.text or "")[:200])
+        except Exception as ex:
+            print("  ! whatsapp (green-api) failed:", ex)
     if e("WHATSAPP_PHONE") and e("WHATSAPP_APIKEY"):
         try:
             # CallMeBot: free, delivers to your OWN WhatsApp. No 24h window, no template approval.
