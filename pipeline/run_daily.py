@@ -259,6 +259,14 @@ def send_daily_notification(now, regime, breadth, modes, top5, brief, funds=None
     is_open = now.hour < 12  # morning run before noon IST = market open; afternoon/evening = market closed
     slot = "morning" if is_open else "evening"
     today = now.strftime("%Y-%m-%d")
+    # Delivery windows (IST). GitHub's free cron can fire late/early, so only notify in sensible hours;
+    # a run that lands outside the window (e.g. a delayed job at 2 AM) is skipped, not sent at a bad time.
+    # Morning push ~11 AM; evening push after the 3:30 PM close. force=True (manual test) bypasses this.
+    mins = now.hour * 60 + now.minute
+    window = (10 * 60, 14 * 60) if is_open else (16 * 60, 21 * 60)  # 10:00-14:00 / 16:00-21:00 IST
+    if not force and not (window[0] <= mins <= window[1]):
+        print(f"Outside {slot} delivery window ({now:%H:%M} IST); skipping notification.")
+        return
     state_f = OUT / "notify_state.json"
     try:
         state = json.loads(state_f.read_text(encoding="utf-8"))

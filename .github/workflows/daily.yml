@@ -1,14 +1,16 @@
 name: Daily market run
 on:
   schedule:
-    # Morning "market open" — several backup times (GitHub cron can be late/skipped); the job only emails once per slot.
-    - cron: "45 3 * * 1-5"    # 09:15 IST
-    - cron: "10 4 * * 1-5"    # 09:40 IST (backup)
-    - cron: "40 4 * * 1-5"    # 10:10 IST (backup)
-    # Evening "market closed"
-    - cron: "30 11 * * 1-5"   # 17:00 IST
-    - cron: "0 12 * * 1-5"    # 17:30 IST (backup)
+    # Times are UTC; IST = UTC+5:30. The job only notifies once per slot AND only inside its IST
+    # delivery window (10:00-14:00 morning / 16:00-21:00 evening), so a delayed cron never pings at 2 AM.
+    # Midday "market open" push ~11 AM IST — several backups (GitHub cron can be late/skipped).
+    - cron: "30 5 * * 1-5"    # 11:00 IST
+    - cron: "55 5 * * 1-5"    # 11:25 IST (backup)
+    - cron: "20 6 * * 1-5"    # 11:50 IST (backup)
+    # Evening "market closed" push after the 3:30 PM close
+    - cron: "0 12 * * 1-5"    # 17:30 IST
     - cron: "30 12 * * 1-5"   # 18:00 IST (backup)
+    - cron: "0 13 * * 1-5"    # 18:30 IST (backup)
   workflow_dispatch:
     inputs:
       force:
