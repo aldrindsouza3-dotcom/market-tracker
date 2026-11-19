@@ -44,13 +44,13 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
           WA_TOKEN: ${{ secrets.WA_TOKEN }}
           WA_PHONE_ID: ${{ secrets.WA_PHONE_ID }}
           WA_TO: ${{ secrets.WA_TO }}
           WA_TEMPLATE: ${{ secrets.WA_TEMPLATE }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
+          # Email disabled on purpose (was filling the Sent folder). To re-enable, add SMTP_* back here.
         run: python pipeline/run_daily.py
       - name: Commit data (keeps track record between runs)
         run: |

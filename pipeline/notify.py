@@ -3,6 +3,7 @@
 App push (own PWA, no app):  VAPID_PRIVATE_KEY + VAPID_SUBJECT + PUSH_SUBS (JSON sub, or list of them)
 Phone push (easiest, free):  NTFY_TOPIC            -> install the ntfy app, subscribe to your secret topic
 Telegram:                    TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
+WhatsApp (easiest, free):    WHATSAPP_PHONE + WHATSAPP_APIKEY   (CallMeBot -- messages go to your own WhatsApp)
 WhatsApp (Meta Cloud API):   WA_TOKEN + WA_PHONE_ID + WA_TO (+ optional WA_TEMPLATE)
 Email:                       SMTP_USER + SMTP_PASS (+ MAIL_TO)  (Gmail app password)
 """
@@ -98,6 +99,23 @@ def send_all(title: str, body: str, url: str | None = None, html: str | None = N
             sent.append("telegram")
         except Exception as ex:
             print("  ! telegram failed:", ex)
+    if e("WHATSAPP_PHONE") and e("WHATSAPP_APIKEY"):
+        try:
+            # CallMeBot: free, delivers to your OWN WhatsApp. No 24h window, no template approval.
+            # WhatsApp renders *bold*; keep the title bold and the body as-is. ~3000 char practical cap.
+            text = f"*{title}*\n\n{body}" + (f"\n\n{url}" if url else "")
+            text = text[:3000]
+            r = requests.get("https://api.callmebot.com/whatsapp.php", timeout=30, params={
+                "phone": e("WHATSAPP_PHONE"), "apikey": e("WHATSAPP_APIKEY"), "text": text,
+            })
+            # CallMeBot returns 200 with an HTML page; treat a non-200 or an error word as failure.
+            low = (r.text or "").lower()
+            if r.status_code == 200 and "error" not in low and "not valid" not in low:
+                sent.append("whatsapp")
+            else:
+                print("  ! whatsapp (callmebot) failed:", r.status_code, (r.text or "")[:160])
+        except Exception as ex:
+            print("  ! whatsapp (callmebot) failed:", ex)
     if e("WA_TOKEN") and e("WA_PHONE_ID") and e("WA_TO"):
         try:
             # Meta only allows free-form text inside 24h of your last message to the number.
