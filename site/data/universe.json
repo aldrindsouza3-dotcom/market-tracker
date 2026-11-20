@@ -1,5 +1,5 @@
 {
-"generated_at": "2026-11-20T19:04:27.290164+05:30",
+"generated_at": "2026-11-21T03:17:34.392706+05:30",
 "asof": "2026-11-20",
 "source": "NSE",
 "total": 3428,
@@ -9,7 +9,7 @@
 "health": {
 "status": "ok",
 "asof": "2026-11-20",
-"stale_days": 0,
+"stale_days": 1,
 "absurd_moves": 0,
 "issues": []
 },
