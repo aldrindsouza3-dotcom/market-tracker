@@ -1,17 +1,22 @@
 name: Daily market run
 on:
   schedule:
-    # Times are UTC; IST = UTC+5:30. The job only notifies once per slot AND only inside its IST
-    # delivery window (10:00-14:00 morning / 16:00-21:00 evening), so a delayed cron never pings at 2 AM.
-    # Midday "market open" push ~11 AM IST — several backups (GitHub cron can be late/skipped).
-    - cron: "30 5 * * 1-5"    # 11:00 IST
-    - cron: "55 5 * * 1-5"    # 11:25 IST (backup)
-    - cron: "20 6 * * 1-5"    # 11:50 IST (backup)
-    # Evening "market closed" push ~7-8 PM IST, after NSE publishes TODAY's official close (~6:30-7 PM).
-    # The job won't send until today's close data is in, so these later times avoid a stale past-day send.
-    - cron: "30 13 * * 1-5"   # 19:00 IST
-    - cron: "0 14 * * 1-5"    # 19:30 IST (backup)
-    - cron: "30 14 * * 1-5"   # 20:00 IST (backup)
+    # Times are UTC; IST = UTC+5:30. GitHub's free cron is best-effort and often drops/delays runs, so we
+    # fire MANY attempts across each delivery window. The job notifies at most once per slot (dedup) and only
+    # inside its IST window (10:00-14:00 morning / 16:00-21:00 evening), so extra fires are cheap no-ops.
+    # Midday "market open" push ~11 AM IST — spread 10:45-13:00 IST so at least one attempt lands.
+    - cron: "15 5 * * 1-5"    # 10:45 IST
+    - cron: "40 5 * * 1-5"    # 11:10 IST
+    - cron: "10 6 * * 1-5"    # 11:40 IST
+    - cron: "45 6 * * 1-5"    # 12:15 IST
+    - cron: "30 7 * * 1-5"    # 13:00 IST
+    # Evening "market closed" push ~7-8 PM IST, after NSE publishes TODAY's close (~6:30-7 PM); won't send
+    # until today's close data is in. Spread 18:45-20:45 IST.
+    - cron: "15 13 * * 1-5"   # 18:45 IST
+    - cron: "40 13 * * 1-5"   # 19:10 IST
+    - cron: "10 14 * * 1-5"   # 19:40 IST
+    - cron: "45 14 * * 1-5"   # 20:15 IST
+    - cron: "15 15 * * 1-5"   # 20:45 IST
   workflow_dispatch:
     inputs:
       force:
