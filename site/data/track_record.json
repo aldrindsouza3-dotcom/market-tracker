@@ -454,11 +454,44 @@
    "status": "OPEN",
    "last": 11203.0,
    "pnl_pct": 0.2
+  },
+  {
+   "date": "2026-11-25",
+   "symbol": "TECHM.NS",
+   "name": "Tech Mahindra",
+   "entry": 1777.5,
+   "stop": 1682.65,
+   "target": 1919.78,
+   "status": "OPEN",
+   "last": 1777.5,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-25",
+   "symbol": "ICICIBANK.NS",
+   "name": "ICICI Bank",
+   "entry": 1585.5,
+   "stop": 1519.35,
+   "target": 1684.73,
+   "status": "OPEN",
+   "last": 1585.5,
+   "pnl_pct": 0.0
+  },
+  {
+   "date": "2026-11-25",
+   "symbol": "DIVISLAB.NS",
+   "name": "Divi's Labs",
+   "entry": 11203.0,
+   "stop": 10593.59,
+   "target": 12117.11,
+   "status": "OPEN",
+   "last": 11203.0,
+   "pnl_pct": 0.0
   }
  ],
  "summary": {
-  "total": 41,
-  "open": 37,
+  "total": 44,
+  "open": 40,
   "hit_rate": 0.75
  }
 }
