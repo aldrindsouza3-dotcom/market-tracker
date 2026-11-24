@@ -145,14 +145,14 @@
  },
  {
   "date": "2026-11-25",
-  "regime": "RISK-ON",
-  "breadth": 0.602,
+  "regime": "MIXED",
+  "breadth": 0.596,
   "nifty": 25349.650390625,
   "sensex": 82435.9921875,
-  "gold": 3557.800048828125,
-  "silver": 40.8650016784668,
+  "gold": 3558.800048828125,
+  "silver": 40.83000183105469,
   "usdinr": 92.9000015258789,
   "advancers": 19,
-  "decliners": 69
+  "decliners": 70
  }
 ]
