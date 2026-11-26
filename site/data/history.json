@@ -166,5 +166,17 @@
   "usdinr": 92.43499755859375,
   "advancers": 39,
   "decliners": 50
+ },
+ {
+  "date": "2026-11-27",
+  "regime": "RISK-ON",
+  "breadth": 0.636,
+  "nifty": 25819.25,
+  "sensex": 83938.28125,
+  "gold": 3593.39990234375,
+  "silver": 41.75,
+  "usdinr": 92.43499755859375,
+  "advancers": 67,
+  "decliners": 21
  }
 ]
