@@ -158,13 +158,13 @@
  {
   "date": "2026-11-26",
   "regime": "RISK-ON",
-  "breadth": 0.636,
+  "breadth": 0.64,
   "nifty": 25884.5,
   "sensex": 84328.59375,
-  "gold": 3597.800048828125,
-  "silver": 41.76499938964844,
+  "gold": 3599.10009765625,
+  "silver": 41.79999923706055,
   "usdinr": 92.43499755859375,
-  "advancers": 38,
+  "advancers": 39,
   "decliners": 50
  }
 ]
